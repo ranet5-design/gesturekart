@@ -203,18 +203,20 @@ All video processing happens on your device. Nothing is uploaded.
 
 ## Team
 
+Built by **Rania Saleem (Roll No. 629)**, Web Design and Development Lab, 7th semester, Section F, who covered all four roles from the brief:
+
 | Role | Member | Owns |
 | --- | --- | --- |
-| CV Lead | Member 1 | `src/cv/` (MediaPipe pipeline, gesture mapping, calibration) |
-| Game Dev | Member 2 | `src/game/` (3D scene, traffic, signals, collisions) |
-| UI/UX Lead | Member 3 | `src/ui/`, `src/audio/`, `src/report/` (HUD, sound, score card) |
-| DevOps & Submissions | Member 4 | Deployment, GitHub, demo video, LinkedIn post |
+| CV Lead | Rania Saleem (629) | `src/cv/` (MediaPipe pipeline, gesture mapping, calibration) |
+| Game Dev | Rania Saleem (629) | `src/game/` (3D scene, traffic, signals, collisions) |
+| UI/UX Lead | Rania Saleem (629) | `src/ui/`, `src/audio/`, `src/report/` (HUD, sound, score card) |
+| DevOps & Submissions | Rania Saleem (629) | Deployment, GitHub, demo video, LinkedIn post |
 
 ## Submission checklist
 
 - [x] Live HTTPS URL on Vercel: https://gesturekart.vercel.app
 - [x] Public GitHub repository with this README
-- [ ] 2-minute screen recording showing live gesture control
+- [x] 2-minute screen recording showing live gesture control
 - [ ] Google Classroom submission (template below)
 - [ ] LinkedIn post tagging the organiser
 
@@ -225,5 +227,5 @@ All video processing happens on your device. Nothing is uploaded.
 🌐 Live App Link: https://gesturekart.vercel.app
 💻 GitHub Repo: https://github.com/ranet5-design/gesturekart
 🎥 Demo Video: <Loom / YouTube link>
-👥 Team Members: <Member 1>, <Member 2>, <Member 3>, <Member 4>
+👥 Team Members: Rania Saleem (Roll No. 629)
 ```
