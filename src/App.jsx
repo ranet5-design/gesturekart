@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import World from './game/World.jsx';
 import { game, resetGame, setPhase, onPhase, buildReport, endDrive, nextView, setView as setGameView } from './game/state.js';
 import { recordDrive, loadHistory, sameName } from './game/history.js';
+import { submitOnline } from './game/online.js';
 import { recordProgress, getProgress, unlockedUpTo } from './game/progress.js';
 import { levelById, evaluate, LEVELS } from './game/levels.js';
 import { settings, onSettings } from './game/settings.js';
@@ -116,7 +117,10 @@ export default function App() {
             levelResult,
             progress,
             prevScore: prev ? prev.score : null,
+            online: { pending: true },
           });
+          // Send to the shared online leaderboard in the background
+          submitOnline(r).then((online) => setReport((cur) => (cur && cur.historyId === saved.entry.id ? { ...cur, online } : cur)));
         }
       }),
     [],

@@ -3201,3 +3201,24 @@ summary:focus-visible {
     flex-direction: column;
   }
 }
+
+/* online leaderboard */
+.online {
+  display: grid;
+  gap: 10px;
+}
+.online-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.online-head select {
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}

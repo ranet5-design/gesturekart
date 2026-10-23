@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { fetchOnline } from '../game/online.js';
+import { LEVELS } from '../game/levels.js';
 import { loadHistory, bestPerPlayer, rankSort, sameName, statsFor, fmtDate, deleteDrives, ordinal } from '../game/history.js';
 import { carById } from '../game/config.js';
 import { fmtTime } from '../report/card.js';
@@ -26,6 +28,92 @@ function Trend({ scores }) {
 
 function Medal({ n }) {
   return <span className={`medal m${n <= 3 ? n : 0}`}>{n <= 3 ? ['🥇', '🥈', '🥉'][n - 1] : `#${n}`}</span>;
+}
+
+/** Shared leaderboard across every laptop and phone, per level. */
+function OnlineBoard({ player }) {
+  const [level, setLevel] = useState(0);
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setData(null);
+    fetchOnline(level).then((d) => alive && setData(d));
+    return () => {
+      alive = false;
+    };
+  }, [level]);
+
+  return (
+    <div className="online">
+      <div className="online-head">
+        <label>
+          Board:{' '}
+          <select value={level} onChange={(e) => setLevel(Number(e.target.value))}>
+            <option value={0}>Free Drive (full Canal Road)</option>
+            {LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                Level {l.id}: {l.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {data?.ok && (
+          <span className="muted">
+            {data.total} player{data.total === 1 ? '' : 's'} · {data.drives} drives worldwide
+          </span>
+        )}
+      </div>
+      {!data ? (
+        <p className="h-empty">Loading the online leaderboard…</p>
+      ) : !data.ok ? (
+        <p className="h-empty">
+          🌍 Online leaderboard unavailable: {data.error}
+          {data.status === 503 && <><br />The game owner needs to connect the free database in Vercel (see README).</>}
+        </p>
+      ) : data.entries.length === 0 ? (
+        <p className="h-empty">No one is on this board yet. Finish a drive to be number 1!</p>
+      ) : (
+        <div className="h-table-wrap">
+          <table className="h-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Driver</th>
+                <th>Best score</th>
+                <th>Distance</th>
+                <th>Car</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.entries.map((e, i) => {
+                const me = sameName(e.player, player);
+                return (
+                  <tr key={`${e.player}-${i}`} className={me ? 'me' : ''}>
+                    <td>
+                      <Medal n={i + 1} />
+                    </td>
+                    <td className="who">
+                      {e.player}
+                      {me && <em>you</em>}
+                    </td>
+                    <td>
+                      <b className={`sc ${tone(e.score)}`}>{e.score}</b> <small>{e.grade}</small>
+                    </td>
+                    <td>
+                      {(e.distance / 1000).toFixed(2)} km <small>· {fmtTime(e.time)}</small>
+                    </td>
+                    <td>{carById(e.car).name}</td>
+                    <td className="dt">{fmtDate(e.date)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -105,9 +193,14 @@ export default function History({ player = '', highlightId, compact = false, onC
         <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>
           All drives ({list.length})
         </button>
+        <button role="tab" aria-selected={tab === 'online'} className={tab === 'online' ? 'on' : ''} onClick={() => setTab('online')}>
+          🌍 Online
+        </button>
       </div>
 
-      {rows.length === 0 ? (
+      {tab === 'online' ? (
+        <OnlineBoard player={player} />
+      ) : rows.length === 0 ? (
         <p className="h-empty">No drives saved yet. Finish a drive and it will show up here with its date and time.</p>
       ) : (
         <div className="h-table-wrap">
@@ -160,7 +253,7 @@ export default function History({ player = '', highlightId, compact = false, onC
         </div>
       )}
 
-      {!compact && player && mine.length > 0 && (
+      {!compact && player && mine.length > 0 && tab !== 'online' && (
         <div className="h-foot">
           {confirm ? (
             <>

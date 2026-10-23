@@ -59,7 +59,15 @@ export default function ScoreCard({ report: r, onAgain, onMenu, onNext }) {
             <span className="rank-pills">
               <b>{ordinal(rk.personal)}</b> of your {rk.personalOf} drive{rk.personalOf > 1 ? 's' : ''}
               <i />
-              <b>#{rk.boardPos}</b> of {rk.boardOf} player{rk.boardOf > 1 ? 's' : ''}
+              <b>#{rk.boardPos}</b> of {rk.boardOf} on this device
+              {r.online?.ok && (
+                <>
+                  <i />
+                  🌍 <b>#{r.online.rank}</b> of {r.online.total} online
+                  {r.online.isBest ? '' : ' (your best still counts)'}
+                </>
+              )}
+              {r.online?.pending && <span className="muted"> · 🌍 sending…</span>}
             </span>
           </div>
         )}

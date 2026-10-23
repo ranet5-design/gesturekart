@@ -78,13 +78,25 @@ You start at **100**. The score is capped at 100.
 
 In a level, a score of 0 fails the level (just retry). Free Drive is the full 1.8 km Canal Road from Thokar Niaz Baig to Dharampura, with one second chance before your licence is suspended.
 
+## Online leaderboard (shared across all devices)
+
+Drives are always saved in the browser. On top of that, each finished drive is sent to a shared online leaderboard (one board per level plus Free Drive), so players on different laptops and phones are ranked together. Only the **name and drive results** go online, never age or CNIC.
+
+The server part is a Vercel function, [`api/leaderboard.js`](api/leaderboard.js), backed by a free **Upstash Redis** database. One-time setup in the Vercel dashboard:
+
+1. Open your project on vercel.com, then go to **Storage → Create Database → Upstash for Redis** (free plan).
+2. Connect it to the `gesturekart` project. Vercel adds the `KV_REST_API_URL` / `KV_REST_API_TOKEN` environment variables automatically.
+3. Redeploy. Until a database is connected, the game keeps working and the Online tab just says the leaderboard isn't set up.
+
+The API validates every submission (score range, realistic speed, clean names) and rate-limits each address to 12 submissions a minute. Without player accounts it can't fully stop someone from posting a fake score, so treat it as a fun class leaderboard.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-50 automated tests (vitest) cover the steering-wheel, brake, indicator, seatbelt and lean gestures, the 100% body lock, the focus/drowsiness detector, every licence level (a scripted careful driver must pass each one, a reckless one must fail), replays, history, XP, streaks and rankings.
+55 automated tests (vitest) cover the online leaderboard API (with an in-memory Redis), the steering-wheel, brake, indicator, seatbelt and lean gestures, the 100% body lock, the focus/drowsiness detector, every licence level (a scripted careful driver must pass each one, a reckless one must fail), replays, history, XP, streaks and rankings.
 
 | Grade | Score |
 | --- | --- |
