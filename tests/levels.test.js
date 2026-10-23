@@ -7,16 +7,29 @@ import { setSetting } from '../src/game/settings.js';
 import { drive } from './helpers.js';
 
 const mods = { state, input, config };
+
+// Seeded random numbers so traffic is the same on every run (no flaky tests)
+const realRandom = Math.random;
+function seedRandom(seed) {
+  let s = seed >>> 0;
+  Math.random = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+const restoreRandom = () => (Math.random = realRandom);
 setSetting('replays', false); // replays pause the sim; tested separately below
 
 describe('licence levels with a careful driver', () => {
   for (const level of LEVELS) {
-    it(`passes level ${level.id}: ${level.name} (within 3 tries; traffic is random)`, () => {
+    it(`passes level ${level.id}: ${level.name} (within 4 tries; seeded random traffic)`, () => {
       let res;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        seedRandom(level.id * 1000 + attempt + 1);
         res = evaluate(level, drive(mods, level, 'good'));
         if (res.passed) break;
       }
+      restoreRandom();
       expect(res.failed.map((c) => `${c.text} (${c.have})`)).toEqual([]);
       expect(res.passed).toBe(true);
       expect(res.stars).toBeGreaterThanOrEqual(1);

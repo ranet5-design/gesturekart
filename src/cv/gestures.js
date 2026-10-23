@@ -29,7 +29,7 @@ const vis = (p) => (p ? p.visibility ?? 1 : 0);
 export function readGesture(lm, aspect = 4 / 3) {
   const out = {
     visible: false, held: false, angle: 0, lift: 0.5, haltRaw: false, lean: 0,
-    sw: 0, span: 0, indicator: null, beltReach: false, beltDown: false,
+    sw: 0, span: 0, indicator: null, beltReach: false, beltDown: false, brakeIntent: false, handsSeen: 0,
   };
   if (!lm) return out;
   const ls = lm[L_SHOULDER];
@@ -59,6 +59,12 @@ export function readGesture(lm, aspect = 4 / 3) {
   out.haltRaw =
     (vis(rw) > 0.5 && vis(nose) > 0.5 && rw.y < nose.y - sw * 0.1) ||
     (vis(rw) < 0.5 && vis(re) > 0.5 && re.y < rs.y - sw * 0.35);
+  // The right hand on its way up to brake: well above the shoulders. While rising it would look like
+  // "left hand low, right hand high" = turning left, so this is not treated as steering.
+  out.brakeIntent =
+    out.haltRaw ||
+    (vis(rw) > 0.5 && rw.y < shoulderY - sw * 0.3) ||
+    (vis(re) > 0.5 && re.y < rs.y - sw * 0.15);
 
   // Indicator: stretch one arm straight out to the side at shoulder height
   const armOut = (w, e, sx, sy, dir) => {
@@ -76,8 +82,15 @@ export function readGesture(lm, aspect = 4 / 3) {
     out.beltDown = rw.y > shoulderY + sw * 1.0 && mx(rw) > (SLx + SRx) / 2;
   }
 
+  out.rwY = vis(rw) > 0.5 ? rw.y : null;
+  out.lwY = vis(lw) > 0.5 ? lw.y : null;
   const bothHands = vis(lw) > 0.5 && vis(rw) > 0.5;
-  if (!bothHands || out.haltRaw || out.indicator) return out;
+  out.handsSeen = (vis(lw) > 0.5 ? 1 : 0) + (vis(rw) > 0.5 ? 1 : 0);
+  // Hands pushed right up to the lens track badly; MediaPipe's z is smaller = closer to the camera
+  if (bothHands && Number.isFinite(lw.z) && Number.isFinite(ls.z)) {
+    out.handsTooClose = (ls.z + rs.z) / 2 - (lw.z + rw.z) / 2 > sw * 1.6;
+  }
+  if (!bothHands || out.brakeIntent || out.indicator) return out;
 
   const Lx = mx(lw);
   const Rx = mx(rw);

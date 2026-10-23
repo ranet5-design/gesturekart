@@ -5,6 +5,7 @@ import { pose, BONES } from '../cv/pose.js';
 // Mirrored webcam view with the tracked skeleton and a virtual steering wheel drawn between the hands.
 export default function CameraPanel({ big = false }) {
   const canvas = useRef();
+  const wheelRef = useRef({ cx: 0, cy: 0, r: 0 });
   useEffect(() => {
     let raf;
     const draw = () => {
@@ -57,35 +58,61 @@ export default function CameraPanel({ big = false }) {
           ctx.stroke();
         }
 
-        // Virtual steering wheel held between the two wrists
-        if (input.wheelHeld && ok(15) && ok(16)) {
+        // Virtual steering wheel between the hands. Its size is capped by shoulder width and its
+        // position is eased, and it turns with the game's smoothed wheel angle, so it never jumps
+        // across the face or fills the screen when the tracker glitches.
+        const W2 = wheelRef.current;
+        if (input.wheelHeld && !input.halt && ok(15) && ok(16) && ok(11) && ok(12)) {
           const [x1, y1] = P(15);
           const [x2, y2] = P(16);
-          const cx = (x1 + x2) / 2;
-          const cy = (y1 + y2) / 2;
-          const r = Math.hypot(x2 - x1, y2 - y1) / 2;
-          ctx.strokeStyle = 'rgba(250,204,21,0.95)';
+          const swPx = Math.hypot(lm[11].x * W - lm[12].x * W, lm[11].y * H - lm[12].y * H);
+          const shoulderY = ((lm[11].y + lm[12].y) / 2) * H;
+          const tcx = (x1 + x2) / 2;
+          const tcy = Math.max(shoulderY + swPx * 0.2, (y1 + y2) / 2);
+          const tr = Math.min(swPx * 1.0, Math.max(swPx * 0.5, Math.hypot(x2 - x1, y2 - y1) / 2));
+          if (!W2.r) Object.assign(W2, { cx: tcx, cy: tcy, r: tr });
+          W2.cx += (tcx - W2.cx) * 0.25;
+          W2.cy += (tcy - W2.cy) * 0.25;
+          W2.r += (tr - W2.r) * 0.15;
+          const { cx, cy, r } = W2;
+          // The canvas is mirrored, so flip the angle to match what the player sees
+          const a = -input.wheelAngle;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(a);
+          ctx.strokeStyle = 'rgba(250,204,21,0.9)';
           ctx.lineWidth = 7 * k;
           ctx.beginPath();
-          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.arc(0, 0, r, 0, Math.PI * 2);
           ctx.stroke();
           ctx.lineWidth = 5 * k;
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          // bottom spoke, perpendicular to the hand line
-          const nx = -(y2 - y1) / (2 * r || 1);
-          const ny = (x2 - x1) / (2 * r || 1);
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(cx + nx * r, cy + ny * r);
+          ctx.moveTo(-r, 0);
+          ctx.lineTo(r, 0);
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, r);
           ctx.stroke();
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(-4 * k, -r - 10 * k, 8 * k, 14 * k); // top marker shows how far it's turned
           ctx.fillStyle = '#0f172a';
           ctx.beginPath();
-          ctx.arc(cx, cy, r * 0.22, 0, Math.PI * 2);
+          ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
           ctx.fill();
-          ctx.strokeStyle = 'rgba(250,204,21,0.95)';
-          ctx.lineWidth = 3 * k;
-          ctx.stroke();
+          ctx.restore();
+        } else {
+          W2.r = 0;
+        }
+
+        // Where to hold the hands: a soft box at chest height
+        if (big && ok(11) && ok(12) && !input.wheelHeld) {
+          const swPx = Math.abs(lm[11].x - lm[12].x) * W;
+          const midX = ((lm[11].x + lm[12].x) / 2) * W;
+          const top = ((lm[11].y + lm[12].y) / 2) * H + swPx * 0.25;
+          ctx.setLineDash([10, 8]);
+          ctx.strokeStyle = 'rgba(250,204,21,0.7)';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(midX - swPx * 1.1, top, swPx * 2.2, swPx * 1.0);
+          ctx.setLineDash([]);
         }
 
         [15, 16].forEach((i) => {

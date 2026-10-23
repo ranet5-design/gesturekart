@@ -48,6 +48,7 @@ function snapshot() {
     pulse: game.focus.pulse > 0,
     faceOn: input.faceReady && settings.focusCheck && input.source === 'camera',
     attentive: input.attentive,
+    tooClose: input.handsTooClose,
     fcw: game.fcw && game.t - game.fcw < 1.2,
     replay: game.replay ? { type: game.replay.type, pct: game.replay.i / Math.max(1, game.replay.frames.length - 1) } : null,
     level: game.level,
@@ -171,6 +172,7 @@ export default function HUD({ onPause, paused, muted, onMute, view, onView, onSe
             <div className="cam-badges">
               <span className={s.lock >= 1 ? 'b good' : 'b warn'}>🔒 {Math.round(s.lock * 100)}%</span>
               {s.faceOn && <span className={s.attentive ? 'b good' : 'b bad'}>{s.attentive ? '👁 focused' : '👁 focus!'}</span>}
+              {s.tooClose && <span className="b warn">✋ hands closer to chest</span>}
               <span className="b">{s.cvFps} fps</span>
             </div>
           </div>

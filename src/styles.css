@@ -3222,3 +3222,28 @@ summary:focus-visible {
   border: 1px solid #cbd5e1;
   background: #fff;
 }
+
+/* Keep the lock / focus box out of the chest area where the hands hold the wheel */
+.cam-stage .lock-overlay {
+  top: 10px;
+  left: 10px;
+  bottom: auto;
+  right: auto;
+  max-width: min(62%, 420px);
+  padding: 8px 12px;
+  gap: 10px;
+}
+.cam-stage .lock-overlay .lock-ring {
+  transform: scale(0.8);
+  transform-origin: left center;
+  margin-right: -14px;
+}
+.cam-stage .lock-text b {
+  font-size: 15px;
+}
+.cam-stage .lock-text span {
+  font-size: 12px;
+}
+.cam-badges .b.warn {
+  color: #fde68a;
+}

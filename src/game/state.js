@@ -597,7 +597,8 @@ export function stepFrame(dt) {
   if (game.indicator.dir && game.t - game.indicator.at > 6) game.indicator.dir = null;
 
   // ---- Player lateral motion ----
-  const steer = input.steer;
+  // Braking = drive straight (raising the right hand must never swerve the car)
+  const steer = halt ? 0 : input.steer;
   const nearestIdx = LANES.reduce((best, c, i) => (Math.abs(game.x - c) < Math.abs(game.x - LANES[best]) ? i : best), 0);
   let vx;
   if (Math.abs(steer) < 0.08) {

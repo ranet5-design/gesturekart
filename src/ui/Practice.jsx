@@ -11,7 +11,7 @@ const CAM_STEPS = [
   {
     id: 'hold',
     title: 'Hold the wheel straight',
-    ur: 'Dono haath seene ke saamne rakhein, jaise steering pakri ho',
+    ur: 'Dono haath seene ke saamne, kohniyan mudi hui (peele dabbe mein). Haath camera ki taraf na barhayein.',
     test: () => input.wheelHeld && Math.abs(input.wheelAngle) < 0.2,
     need: 1.2,
   },
@@ -179,6 +179,7 @@ export default function Practice({ mode, short = false, level, onDone, onBack })
           held: input.wheelHeld,
           halt: input.halt,
           lift: input.wheelLift,
+          tooClose: input.handsTooClose,
         });
       }
     };
@@ -226,7 +227,14 @@ export default function Practice({ mode, short = false, level, onDone, onBack })
                   <LockRing value={v.lock} locked={v.locked} size={96} />
                   <div className="lock-text">
                     {v.locked ? (
-                      <b className="good">Body locked ✓</b>
+                      v.tooClose ? (
+                        <>
+                          <b className="warn">Hands too close to the camera</b>
+                          <span>Bring your hands back to your chest, elbows bent. Haath seene ke paas rakhein.</span>
+                        </>
+                      ) : (
+                        <b className="good">Body locked ✓</b>
+                      )
                     ) : (
                       <>
                         <b>{v.issue || 'Hold still…'}</b>

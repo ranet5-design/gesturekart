@@ -13,6 +13,7 @@ export const input = {
   seatbelt: false, // seatbelt gesture done (camera) or B pressed (keyboard)
   // camera-only details, used by the HUD and the camera panel
   poseVisible: false,
+  handsTooClose: false, // hands pushed toward the lens: tracking gets unreliable
   lock: 0, // body-lock meter 0..1
   locked: false, // true once the lock reaches 100%; game only runs while locked
   lockIssue: '', // hint like "Move back a little"
