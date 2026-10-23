@@ -78,6 +78,10 @@ You start at **100**. The score is capped at 100.
 
 In a level, a score of 0 fails the level (just retry). Free Drive is the full 1.8 km Canal Road from Thokar Niaz Baig to Dharampura, with one second chance before your licence is suspended.
 
+## About the demo video (privacy mode)
+
+The demo video is a **real, live webcam session**: MediaPipe tracks my body in real time and every steer, brake and gesture you see is me playing. I chose not to show my face, so I turned on the game's **"🙈 Hide my face" (Privacy Mode)**. It hides the camera picture and draws only the live stick figure (skeleton) and virtual steering wheel that the tracker produces. The camera panel is labelled "● LIVE WEBCAM · face hidden". Tracking, the 100% body lock and the focus check work exactly the same with it on or off. Anyone can check this by opening the live app, starting with the webcam and pressing "Hide my face" on the practice screen.
+
 ## Online leaderboard (shared across all devices)
 
 Drives are always saved in the browser. On top of that, each finished drive is sent to a shared online leaderboard (one board per level plus Free Drive), so players on different laptops and phones are ranked together. Only the **name and drive results** go online, never age or CNIC.

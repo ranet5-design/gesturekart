@@ -158,6 +158,23 @@ export default function CameraPanel({ big = false }) {
         }
       }
       ctx.restore();
+
+      // Make it obvious the webcam is live even though the picture is hidden
+      if (settings.privacy && pose.video) {
+        const live = Math.floor(performance.now() / 600) % 2 === 0;
+        const fs = big ? 15 : 10;
+        ctx.font = `700 ${fs}px "Space Grotesk", Arial, sans-serif`;
+        const text = '● LIVE WEBCAM · face hidden (privacy mode)';
+        const tw = ctx.measureText(text).width;
+        const pad = fs * 0.6;
+        const y = H - fs * 2.2;
+        ctx.fillStyle = 'rgba(7,11,22,0.85)';
+        ctx.fillRect(W / 2 - tw / 2 - pad, y - fs, tw + pad * 2, fs * 1.7);
+        ctx.fillStyle = live ? '#ef4444' : '#7f1d1d';
+        ctx.fillText('●', W / 2 - tw / 2, y + fs * 0.35);
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillText(text.slice(1), W / 2 - tw / 2 + ctx.measureText('●').width, y + fs * 0.35);
+      }
     };
     draw();
     return () => cancelAnimationFrame(raf);
