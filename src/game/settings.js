@@ -14,6 +14,7 @@ export const DEFAULTS = {
   replays: true, // slow-motion replay after a serious mistake
   music: true,
   focusCheck: true, // eyes / sleepiness / distraction detection
+  privacy: false, // never draw the camera image: only a stick figure (handy for recording a demo)
 };
 
 function load() {

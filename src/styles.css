@@ -3247,3 +3247,9 @@ summary:focus-visible {
 .cam-badges .b.warn {
   color: #fde68a;
 }
+
+.practice-actions .secondary.on {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--good);
+  color: #86efac;
+}

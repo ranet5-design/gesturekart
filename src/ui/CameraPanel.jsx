@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { input } from '../cv/input.js';
 import { pose, BONES } from '../cv/pose.js';
+import { settings } from '../game/settings.js';
 
 // Mirrored webcam view with the tracked skeleton and a virtual steering wheel drawn between the hands.
 export default function CameraPanel({ big = false }) {
@@ -19,16 +20,40 @@ export default function CameraPanel({ big = false }) {
       ctx.clearRect(0, 0, W, H);
       ctx.translate(W, 0);
       ctx.scale(-1, 1); // mirror, so moving right moves right on screen
-      if (pose.video && pose.video.readyState >= 2) {
+      const privacy = settings.privacy;
+      if (pose.video && pose.video.readyState >= 2 && !privacy) {
         ctx.drawImage(pose.video, 0, 0, W, H);
         ctx.fillStyle = 'rgba(8,12,24,0.25)';
         ctx.fillRect(0, 0, W, H);
       } else {
+        // Privacy mode: no camera image at all, just a dark stage with a soft grid
         ctx.fillStyle = '#0b1220';
         ctx.fillRect(0, 0, W, H);
+        ctx.strokeStyle = 'rgba(148,163,184,0.08)';
+        ctx.lineWidth = 1;
+        for (let gx = 0; gx < W; gx += 32) {
+          ctx.beginPath();
+          ctx.moveTo(gx, 0);
+          ctx.lineTo(gx, H);
+          ctx.stroke();
+        }
+        for (let gy = 0; gy < H; gy += 32) {
+          ctx.beginPath();
+          ctx.moveTo(0, gy);
+          ctx.lineTo(W, gy);
+          ctx.stroke();
+        }
       }
       const lm = input.landmarks;
       const k = big ? 1.6 : 1;
+      // Privacy mode: draw the head as a plain circle (no face) so the stick figure still reads as a person
+      if (privacy && lm && (lm[0].visibility ?? 1) > 0.5 && (lm[11].visibility ?? 1) > 0.5) {
+        const sw = Math.abs(lm[11].x - lm[12].x) * W;
+        ctx.fillStyle = input.locked ? 'rgba(34,197,94,0.35)' : 'rgba(245,158,11,0.35)';
+        ctx.beginPath();
+        ctx.arc(lm[0].x * W, lm[0].y * H, Math.max(14, sw * 0.38), 0, Math.PI * 2);
+        ctx.fill();
+      }
       if (lm) {
         const P = (i) => [lm[i].x * W, lm[i].y * H];
         const ok = (i) => (lm[i].visibility ?? 1) > 0.5;

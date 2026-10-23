@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { input, updateKeyboard, keyDown } from '../cv/input.js';
 import { beginCalibration, endCalibration, resetSeatbelt } from '../cv/pose.js';
-import { settings } from '../game/settings.js';
+import { settings, setSetting } from '../game/settings.js';
 import { chime } from '../audio/sound.js';
 import { say } from '../audio/voice.js';
 import CameraPanel from './CameraPanel.jsx';
@@ -106,6 +106,7 @@ function buildSteps(camera, short, level) {
  */
 export default function Practice({ mode, short = false, level, onDone, onBack }) {
   const camera = mode === 'camera';
+  const [privacy, setPrivacy] = useState(settings.privacy);
   const [steps] = useState(() => {
     lastIndicator = null;
     input.seatbelt = false;
@@ -201,6 +202,18 @@ export default function Practice({ mode, short = false, level, onDone, onBack })
             <h2>{waitingLock ? 'Locking on to your body…' : done ? 'Ready to drive!' : 'Practice the controls'}</h2>
           </div>
           <div className="practice-actions">
+            {camera && (
+              <button
+                className={privacy ? 'secondary on' : 'secondary'}
+                aria-pressed={privacy}
+                onClick={() => {
+                  setSetting('privacy', !privacy);
+                  setPrivacy(!privacy);
+                }}
+              >
+                {privacy ? '🙈 Face hidden' : '🙈 Hide my face'}
+              </button>
+            )}
             <button className="ghost" onClick={onBack}>
               ← Back
             </button>

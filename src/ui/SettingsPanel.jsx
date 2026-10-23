@@ -107,6 +107,7 @@ export default function SettingsPanel({ onClose }) {
 
         <section>
           <h3>Game</h3>
+          <Toggle k="privacy" label="Privacy mode (hide my camera image)" hint="Shows only a stick figure, never your face. Good for recording a demo video. Tracking still works the same." />
           <Toggle k="focusCheck" label="Focus & drowsiness check" hint="Uses your face to spot closed eyes, yawning or looking at a phone." />
           <Toggle k="replays" label="Mistake replays" hint="Slow-motion replay after a red light, crash or pedestrian hit." />
           <Toggle k="music" label="Background music" />
