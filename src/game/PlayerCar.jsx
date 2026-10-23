@@ -44,11 +44,15 @@ const BODIES = {
     wheels: [[-0.82, 0.32, -1.2, 0.32, 0.24], [0.82, 0.32, -1.2, 0.32, 0.24], [-0.82, 0.32, 1.2, 0.32, 0.24], [0.82, 0.32, 1.2, 0.32, 0.24]],
     brake: [0.75, 1.86],
     driver: false,
+    cabin: (c) => (
+      <>
+        <Box p={[0, 1.2, 0.55]} s={[1.5, 0.62, 2.1]} glass />
+        <Box p={[0, 1.53, 0.55]} s={[1.52, 0.06, 2.05]} c={c} />
+      </>
+    ),
     parts: (c) => (
       <>
         <Box p={[0, 0.6, 0]} s={[1.6, 0.6, 3.7]} c={c} />
-        <Box p={[0, 1.2, 0.55]} s={[1.5, 0.62, 2.1]} glass />
-        <Box p={[0, 1.53, 0.55]} s={[1.52, 0.06, 2.05]} c={c} />
         <Box p={[0, 0.45, -1.87]} s={[1.62, 0.18, 0.1]} c="#adb5bd" />
         <Box p={[-0.55, 0.7, -1.86]} s={[0.3, 0.14, 0.04]} c="#fff8d6" />
         <Box p={[0.55, 0.7, -1.86]} s={[0.3, 0.14, 0.04]} c="#fff8d6" />
@@ -59,11 +63,15 @@ const BODIES = {
     wheels: [[-0.88, 0.34, -1.35, 0.34, 0.26], [0.88, 0.34, -1.35, 0.34, 0.26], [-0.88, 0.34, 1.35, 0.34, 0.26], [0.88, 0.34, 1.35, 0.34, 0.26]],
     brake: [0.72, 2.11],
     driver: false,
+    cabin: (c) => (
+      <>
+        <Box p={[0, 1.08, 0.35]} s={[1.6, 0.5, 2.0]} glass />
+        <Box p={[0, 1.35, 0.35]} s={[1.62, 0.05, 1.9]} c={c} />
+      </>
+    ),
     parts: (c) => (
       <>
         <Box p={[0, 0.58, 0]} s={[1.75, 0.55, 4.2]} c={c} />
-        <Box p={[0, 1.08, 0.35]} s={[1.6, 0.5, 2.0]} glass />
-        <Box p={[0, 1.35, 0.35]} s={[1.62, 0.05, 1.9]} c={c} />
         <Box p={[0, 0.88, 1.75]} s={[1.6, 0.06, 0.4]} c="#111" />
         <Box p={[-0.6, 0.66, -2.11]} s={[0.36, 0.12, 0.04]} c="#fff8d6" />
         <Box p={[0.6, 0.66, -2.11]} s={[0.36, 0.12, 0.04]} c="#fff8d6" />
@@ -74,16 +82,20 @@ const BODIES = {
     wheels: [[0, 0.3, -1.05, 0.3, 0.18], [-0.66, 0.3, 0.85, 0.3, 0.18], [0.66, 0.3, 0.85, 0.3, 0.18]],
     brake: [0.75, 1.3],
     driver: true,
-    parts: (c) => (
+    cabin: () => (
       <>
-        <Box p={[0, 0.75, 0.1]} s={[1.4, 0.8, 2.4]} c={c} />
         <Box p={[0, 1.62, 0.15]} s={[1.5, 0.12, 2.5]} c="#111" />
         <Box p={[-0.7, 1.2, 1.3]} s={[0.06, 0.8, 0.06]} c="#111" />
         <Box p={[0.7, 1.2, 1.3]} s={[0.06, 0.8, 0.06]} c="#111" />
         <Box p={[-0.7, 1.2, -1.05]} s={[0.06, 0.8, 0.06]} c="#111" />
         <Box p={[0.7, 1.2, -1.05]} s={[0.06, 0.8, 0.06]} c="#111" />
-        <Box p={[0, 0.95, -0.95]} s={[1.42, 0.14, 0.5]} c="#ffd166" />
         <Box p={[0, 1.15, 1.31]} s={[1.3, 0.55, 0.04]} c="#ffd166" />
+      </>
+    ),
+    parts: (c) => (
+      <>
+        <Box p={[0, 0.75, 0.1]} s={[1.4, 0.8, 2.4]} c={c} />
+        <Box p={[0, 0.95, -0.95]} s={[1.42, 0.14, 0.5]} c="#ffd166" />
       </>
     ),
   },
@@ -91,11 +103,15 @@ const BODIES = {
     wheels: [[-0.95, 0.4, -1.45, 0.4, 0.3], [0.95, 0.4, -1.45, 0.4, 0.3], [-0.95, 0.4, 1.35, 0.4, 0.3], [0.95, 0.4, 1.35, 0.4, 0.3]],
     brake: [0.85, 2.31],
     driver: false,
+    cabin: (c) => (
+      <>
+        <Box p={[0, 1.35, -0.55]} s={[1.8, 0.6, 1.4]} glass />
+        <Box p={[0, 1.68, -0.55]} s={[1.82, 0.06, 1.42]} c={c} />
+      </>
+    ),
     parts: (c) => (
       <>
         <Box p={[0, 0.72, -0.9]} s={[1.9, 0.7, 2.6]} c={c} />
-        <Box p={[0, 1.35, -0.55]} s={[1.8, 0.6, 1.4]} glass />
-        <Box p={[0, 1.68, -0.55]} s={[1.82, 0.06, 1.42]} c={c} />
         <Box p={[0, 0.55, 1.3]} s={[1.9, 0.4, 2.0]} c="#6b705c" />
         <Box p={[-0.92, 0.92, 1.3]} s={[0.06, 0.4, 2.0]} c={c} />
         <Box p={[0.92, 0.92, 1.3]} s={[0.06, 0.4, 2.0]} c={c} />
@@ -113,8 +129,16 @@ export default function PlayerCar({ car, color }) {
   const driver = useRef();
   const steering = useRef();
   const gloves = useRef();
+  const cabin = useRef();
   const brake = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#5a0000', emissive: '#ff1a1a', emissiveIntensity: 0.4 }),
+    [],
+  );
+  const blinkers = useMemo(
+    () => ({
+      left: new THREE.MeshStandardMaterial({ color: '#4a3000', emissive: '#ffa200', emissiveIntensity: 0 }),
+      right: new THREE.MeshStandardMaterial({ color: '#4a3000', emissive: '#ffa200', emissiveIntensity: 0 }),
+    }),
     [],
   );
   useFrame((state, dt) => {
@@ -125,8 +149,13 @@ export default function PlayerCar({ car, color }) {
     g.visible = !(game.invuln > 0 && Math.floor(state.clock.elapsedTime * 12) % 2 === 0);
     wheels.current.forEach((w, i) => w && (w.rotation.x -= (game.v * dt) / (spec.wheels[i]?.[3] || 0.35)));
     brake.emissiveIntensity = game.braking || game.v < 0.3 ? 2.5 : 0.4;
-    const cockpit = game.view === 'cockpit' && game.phase !== 'menu';
+    const cockpit = game.view === 'cockpit' && !['menu', 'levels', 'history'].includes(game.phase) && !game.replay;
     if (driver.current) driver.current.visible = spec.driver && !cockpit;
+    // From the driver's seat, roof / pillars / glass would block the view, so hide them
+    if (cabin.current) cabin.current.visible = !cockpit;
+    const on = Math.floor(state.clock.elapsedTime * 3) % 2 === 0;
+    blinkers.left.emissiveIntensity = game.indicator?.dir === 'left' && on ? 3 : 0;
+    blinkers.right.emissiveIntensity = game.indicator?.dir === 'right' && on ? 3 : 0;
     // The 3D steering wheel copies the player's real hands (clockwise from the driver = turn right)
     steering.current.rotation.z = -input.wheelAngle;
     gloves.current.visible = input.wheelHeld && !input.halt;
@@ -136,6 +165,18 @@ export default function PlayerCar({ car, color }) {
   return (
     <group ref={ref}>
       {spec.parts(color)}
+      {spec.cabin && <group ref={cabin}>{spec.cabin(color)}</group>}
+      {/* indicators: front corners (seen from the cockpit) and rear corners */}
+      {[
+        ['left', -0.7, -1.9],
+        ['right', 0.7, -1.9],
+        ['left', -0.75, bz - 0.02],
+        ['right', 0.75, bz - 0.02],
+      ].map(([side, x, z], i) => (
+        <mesh key={i} position={[x, by + 0.12, z]} material={blinkers[side]}>
+          <boxGeometry args={[0.22, 0.1, 0.08]} />
+        </mesh>
+      ))}
 
       <group ref={driver}>
         <mesh position={[0, 0.85, 0.35]} castShadow>

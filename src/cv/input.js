@@ -7,6 +7,10 @@ export const input = {
   wheelHeld: false, // both hands on the virtual steering wheel
   wheelAngle: 0, // radians, for drawing the wheel (+ = turned right)
   wheelLift: 0.5, // 0 (low, slow) .. 1 (high, fast), for the HUD
+  steerSource: 'wheel', // 'wheel' | 'lean' (hands out of view: torso lean steers)
+  resting: false, // arm-rest cruise is holding the speed
+  indicator: null, // 'left' | 'right' — one-shot, consumed by the game
+  seatbelt: false, // seatbelt gesture done (camera) or B pressed (keyboard)
   // camera-only details, used by the HUD and the camera panel
   poseVisible: false,
   lock: 0, // body-lock meter 0..1
@@ -15,9 +19,18 @@ export const input = {
   lockParts: 0, // upper-body points clearly seen, out of 7
   landmarks: null,
   cvFps: 0,
+  // focus (face) tracking
+  faceReady: false,
+  faceSeen: false,
+  eyesClosed: false,
+  attentive: true,
+  focusMeter: 1, // 0..1, must reach 1 to resume after a focus pause
+  focusArmed: false, // only queue focus warnings while actually driving
+  focusEvents: [], // queue of 'eyes' | 'drowsy' | 'yawn' | 'away' | 'down' | 'noface'
+  faceLandmarks: null,
 };
 
-const GAME_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'a', 'd', 'w', 's'];
+const GAME_KEYS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' ', 'a', 'd', 'w', 's', 'q', 'e', 'b'];
 const keys = new Set();
 let kbGas = 0.55;
 
@@ -31,6 +44,11 @@ function onKey(e, down) {
   if (isTyping(e)) return;
   const k = e.key.toLowerCase();
   if (GAME_KEYS.includes(k)) e.preventDefault();
+  if (down && !keys.has(k)) {
+    if (k === 'q') input.indicator = 'left';
+    if (k === 'e') input.indicator = 'right';
+    if (k === 'b') input.seatbelt = true;
+  }
   if (down) keys.add(k);
   else keys.delete(k);
 }
@@ -84,5 +102,9 @@ export function resetInput(source) {
   input.wheelHeld = source === 'keyboard';
   input.wheelAngle = 0;
   input.wheelLift = 0.5;
+  input.indicator = null;
+  input.resting = false;
+  input.focusEvents.length = 0;
+  input.focusMeter = 1;
   kbGas = 0.55;
 }

@@ -17,7 +17,14 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 | --- | --- |
 | **Computer vision** | MediaPipe Pose Landmarker (33 body points) runs in the browser on the GPU. Your two hands become an invisible steering wheel: turn it to steer, lift it to speed up, raise your right hand to brake. Works sitting down. |
 | **100% body lock** | The drive never starts until the camera has locked on to your head, shoulders, elbows and hands for 1.5 s straight, with live hints ("Move back a little", "Move to the centre"). If the lock is lost mid-drive, the game pauses itself and resumes when you're back. |
-| **Step-by-step setup** | Four short steps before you drive: **Driver** (name, age, CNIC; the demo accepts only the test CNIC `123456789` and shows just its last 4 digits), **Car**, **View**, and **Learn** (how to drive + how scoring works). |
+| **Focus & drowsiness check** | MediaPipe Face Landmarker watches for eyes closed over 1.3 s, heavy blinking over the last minute (PERCLOS), yawning, looking down at a phone, or turning away. 1st warning: a FOCUS banner, a voice alert and the car eases off. 2nd: soft white pulses. 3rd within 2 minutes: the car stops and the game stays paused until a Focus meter reaches 100% (3 s of steady, eyes-open attention). Pulses stay under 3 flashes per second (photosensitivity guideline), and can be turned off. |
+| **8 licence levels** | Learner Permit → Signals & Zebra → City Traffic → Speed Zones → Indicators → Night & Rain → Rush Hour → Final Driving Test (examiner mode). Each level has clear pass rules and 1–3 stars, and a map shows what is cleared, what is left, and your licence progress. Clear all 8 to earn the GestureKart licence. |
+| **Learning by doing** | Slow-motion replay of the last 5 seconds after a serious mistake, a rule card (English + Roman Urdu) for every penalty, a forward collision warning, a skill radar (signals, lanes, speed, distance, pedestrians, focus) and a "practise this level next" tip. |
+| **Motivation** | XP with combos (up to ×5), rank titles from Learner to Civic Hero, daily streaks 🔥, a daily challenge, "Perfect stop!" pop-ups, best moment of the drive, "better than last time" comparison, and a second chance in Free Drive. Share your card to WhatsApp or LinkedIn. |
+| **Pakistan-specific road** | Ambulance (Rescue 1122) that you must give way to, wrong-way bikers, donkey carts, school and hospital speed zones, Urdu/Roman Urdu signboards, and an **Urdu voice coach** (Urdu voice in Edge, Hindi voice or Roman Urdu captions elsewhere). |
+| **Real driving habits** | Seatbelt gesture before every drive, arm-out indicator before lane changes, night headlights, rain that lengthens braking, and fog. |
+| **Step-by-step setup** | Short steps before you drive: **Driver** (name, age, CNIC; the demo accepts only the test CNIC `123456789` and shows just its last 4 digits), **Level**, **Car**, **View**, and **Learn** (how to drive + how scoring works). |
+| **Settings** | Speed mode (Auto / wheel height / hand distance as in the brief / lean forward-back), arm rest cruise, one-hand mode, colour-blind STOP/WAIT/GO signals, flash off, replays, music, focus check. |
 | **5 cars** | GK Kart, City Hatch, Sedan, Rickshaw and Pickup, each with its own 3D model, top speed, pickup, brakes and turning. |
 | **3 camera views** | Driver seat (a 3D steering wheel with gloved hands turns exactly as your real hands do), behind the car, or a high wide angle. Press `C` to switch during a drive. |
 | **History & leaderboard** | Every drive is saved in your browser with its date and time. You see your rank among your own drives and on the leaderboard (each player's best), your best and average score, and your score trend. |
@@ -34,11 +41,13 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 
 | Gesture (webcam) | Keyboard | Action |
 | --- | --- | --- |
-| Hold both hands in front of your chest and **turn the invisible wheel** (leaning into the turn adds a little extra) | `←` `→` or `A` `D` | Steer / change lanes |
-| **Lift the wheel** toward your shoulders (lower it to slow down) | `↑` `↓` or `W` `S` | Speed |
+| Hold both hands in front of your chest and **turn the invisible wheel**. If your hands are out of view, **lean your torso** to steer (as in the brief). | `←` `→` or `A` `D` | Steer / change lanes |
+| **Auto speed** (default): the car keeps a safe speed; **lower the wheel** to slow down. Other modes in Settings: wheel height, hand distance, lean forward/back. | `↑` `↓` or `W` `S` | Speed |
 | Raise your **right hand above your head** | `Space` | Brake |
-| Let go of the wheel | | Car rolls to a stop |
-| | `C` | Driver's seat / behind-the-car view |
+| Stretch your **left or right arm straight out** to the side | `Q` / `E` | Indicator |
+| Right hand to the left shoulder, then pull down to the right hip | `B` | Seatbelt |
+| | `C` | Driver seat / behind the car / wide angle |
+| | `Enter` | Skip a replay |
 | | `P` / `Esc` | Pause |
 | | `M` | Mute |
 
@@ -57,10 +66,25 @@ You start at **100**. The score is capped at 100.
 | Unsafe lane change (cut in close, or at a junction) | −4 |
 | Lane straddling (between lanes for over 2.5 s) | −3 |
 | Tailgating (under ~1 s gap) | −3 |
+| Hit a wrong-way biker | −15 |
+| Blocked an ambulance | −8 |
+| Focus warning (eyes closed, yawning, phone, looking away) | −5 |
+| Lane change without indicator (levels 5+) | −3 |
 | Stopped at red and waited for green | +8 |
+| Gave way to an ambulance | +6 |
 | Clean lane change | +4 |
+| Dodged a wrong-way biker | +4 |
+| Seatbelt fastened | +2 |
 
-The route is 1.8 km, from Thokar Niaz Baig to Dharampura. If your score hits 0, your licence is suspended and the drive ends.
+In a level, a score of 0 fails the level (just retry). Free Drive is the full 1.8 km Canal Road from Thokar Niaz Baig to Dharampura, with one second chance before your licence is suspended.
+
+## Tests
+
+```bash
+npm test
+```
+
+50 automated tests (vitest) cover the steering-wheel, brake, indicator, seatbelt and lean gestures, the 100% body lock, the focus/drowsiness detector, every licence level (a scripted careful driver must pass each one, a reckless one must fail), replays, history, XP, streaks and rankings.
 
 | Grade | Score |
 | --- | --- |
@@ -120,7 +144,8 @@ gesturekart/
 │   ├── styles.css            # HUD, menus and score card styling
 │   ├── cv/
 │   │   ├── pose.js           # Webcam + MediaPipe Pose loop, smoothing, calibration
-│   │   ├── gestures.js       # Pure maths: virtual wheel, lean, brake, body lock
+│   │   ├── gestures.js       # Pure maths: virtual wheel, lean, brake, indicator, seatbelt, body lock
+│   │   ├── focus.js          # Pure maths: eyes closed, PERCLOS drowsiness, yawn, phone/looking away
 │   │   └── input.js          # Shared input state + keyboard fallback
 │   ├── game/
 │   │   ├── config.js         # Lanes, speed limit, route, points table, the 5 cars
@@ -128,6 +153,10 @@ gesturekart/
 │   │   ├── PlayerCar.jsx     # The 5 car models + shared cockpit and steering wheel
 │   │   ├── state.js          # Physics, traffic AI, signals, pedestrians, rules engine, report
 │   │   ├── World.jsx         # 3D scene (road, canal, scenery, signals, vehicles, kart, camera)
+│   │   ├── levels.js         # The 8 licence levels + Free Drive, pass rules and stars
+│   │   ├── progress.js       # XP, rank titles, streaks, daily challenge, unlocked levels
+│   │   ├── rules.js          # Rule cards and skill scores
+│   │   ├── settings.js       # Player settings
 │   │   └── textures.js       # Procedural canvas textures (no image assets)
 │   ├── audio/
 │   │   ├── sound.js          # Web Audio engine hum + effects
@@ -139,6 +168,9 @@ gesturekart/
 │   │   ├── Practice.jsx      # 100% body lock + step-by-step gesture practice
 │   │   ├── Widgets.jsx       # Steering wheel, lock ring, speed gauge
 │   │   ├── CameraPanel.jsx   # Mirrored webcam view, skeleton and virtual wheel overlay
+│   │   ├── LevelMap.jsx      # Road-to-licence map
+│   │   ├── SettingsPanel.jsx
+│   │   ├── SkillRadar.jsx
 │   │   └── ScoreCard.jsx
 │   └── report/
 │       └── card.js           # Score card canvas → PDF / PNG

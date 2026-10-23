@@ -3,10 +3,12 @@ import { Wheel } from './Widgets.jsx';
 import { VIEWS } from '../game/state.js';
 import { CARS, POINTS, SPEED_LIMIT_KMH } from '../game/config.js';
 import { loadHistory, sameName, statsFor, bestPerPlayer, fmtDate } from '../game/history.js';
+import { levelById } from '../game/levels.js';
+import LevelMap from './LevelMap.jsx';
 
 // This is a demo build: only the published test CNIC is accepted, and it is never stored in full.
 export const DEMO_CNIC = '123456789';
-const STEPS = ['Driver', 'Car', 'View', 'Learn & start'];
+const STEPS = ['Driver', 'Level', 'Car', 'View', 'Learn & start'];
 
 /* ---------- small illustrations ---------- */
 
@@ -120,6 +122,23 @@ function Art({ kind }) {
         <span className="arr down">▼</span>
       </div>
     );
+  if (kind === 'indicator')
+    return (
+      <div className="art art-ind" aria-hidden="true">
+        <span className="blink l">◀</span>
+        <span className="head" />
+        <span className="arm" />
+        <span className="blink r">▶</span>
+      </div>
+    );
+  if (kind === 'belt')
+    return (
+      <div className="art art-belt" aria-hidden="true">
+        <span className="torso" />
+        <span className="strap" />
+        <span className="click">click!</span>
+      </div>
+    );
   return (
     <div className="art art-brake" aria-hidden="true">
       <span className="hand">✋</span>
@@ -130,9 +149,11 @@ function Art({ kind }) {
 }
 
 const HOW = [
-  { art: 'turn', title: 'Turn the wheel', text: 'Hold both hands in front of your chest like a steering wheel. Turn it, and the car goes that way.', ur: 'Steering ghumayein, gaari usi taraf jayegi' },
-  { art: 'lift', title: 'Lift = faster', text: 'Raise the wheel toward your shoulders to speed up, lower it to slow down. Let go to roll to a stop.', ur: 'Wheel upar = tez, neeche = aahista' },
+  { art: 'turn', title: 'Turn the wheel', text: 'Hold both hands in front of your chest like a steering wheel. Turn it, and the car goes that way. Hands out of view? Lean your body instead.', ur: 'Steering ghumayein, gaari usi taraf jayegi' },
+  { art: 'lift', title: 'Speed', text: 'Auto speed keeps a safe speed for you. Lower the wheel toward your belly to slow down. (Other speed modes are in Settings.)', ur: 'Wheel neeche = aahista' },
   { art: 'brake', title: 'Right hand up = brake', text: 'At a red light, raise your right hand above your head. Wait for green, then hold the wheel again.', ur: 'Laal batti par right haath upar' },
+  { art: 'indicator', title: 'Arm out = indicator', text: 'Before changing lanes, stretch your left or right arm straight out to the side for a second.', ur: 'Lane badalne se pehle baazu bahar = indicator' },
+  { art: 'belt', title: 'Seatbelt first', text: 'Before every drive: reach your right hand to your left shoulder, then pull it down to your right hip.', ur: 'Pehle seatbelt: daayan haath baayen kandhe se neeche' },
 ];
 
 const LOSE = [
@@ -143,10 +164,18 @@ const LOSE = [
   ['↔', 'Cut in close, weave, or change lanes at a crossing', POINTS.unsafeLane],
   ['🚗', 'Tailgate (too close to the car ahead)', POINTS.tailgate],
   ['〰', 'Sit between two lanes for 2+ seconds', POINTS.straddle],
+  ['🚑', 'Block an ambulance', POINTS.noYield],
+  ['🏍', 'Hit a wrong-way biker', POINTS.wrongWay],
+  ['😴', 'Close your eyes, yawn or look at your phone', POINTS.focus],
+  ['◀', 'Change lanes without the indicator (levels 5+)', POINTS.noIndicator],
 ];
 const EARN = [
   ['✋', 'Stop before the line at red and wait for green', POINTS.goodStop],
   ['✓', 'Clean lane change (smooth, with space)', POINTS.cleanLane],
+  ['🚑', 'Make way for an ambulance', POINTS.gaveWay],
+  ['🏍', 'Dodge a wrong-way biker', POINTS.avoided],
+  ['🔒', 'Fasten your seatbelt', POINTS.seatbelt],
+  ['🔥', 'Good habits in a row build a combo: up to ×5 XP', 0],
 ];
 const GRADES = [
   ['A+', 95, 'Model Citizen'],
@@ -159,7 +188,9 @@ const GRADES = [
 
 /* ---------- the wizard ---------- */
 
-export default function StartScreen({ onStart, error, profile: saved, view, onView, car, onCar, onHistory, initialStep = 0 }) {
+export default function StartScreen({
+  onStart, error, profile: saved, view, onView, car, onCar, onHistory, onSettings, level, onLevel, initialStep = 0,
+}) {
   const [step, setStep] = useState(initialStep);
   const [name, setName] = useState(saved?.name || '');
   const [age, setAge] = useState(saved?.age ? String(saved.age) : '');
@@ -205,9 +236,14 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
               <p className="tag">Drive Lahore's Canal Road with an invisible steering wheel.</p>
             </div>
           </div>
-          <button type="button" className="secondary" onClick={() => onHistory(name)}>
-            🏆 History &amp; leaderboard{all.length ? ` (${all.length})` : ''}
-          </button>
+          <div className="head-btns">
+            <button type="button" className="secondary" onClick={() => onHistory(name)}>
+              🏆 History &amp; leaderboard{all.length ? ` (${all.length})` : ''}
+            </button>
+            <button type="button" className="ghost" onClick={onSettings} aria-label="Settings">
+              ⚙ Settings
+            </button>
+          </div>
         </header>
 
         <ol className="stepper" aria-label="Setup steps">
@@ -274,6 +310,14 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
 
           {step === 1 && (
             <div>
+              <h2>Your road to the licence</h2>
+              <p className="sub">Clear all 8 levels to earn your GestureKart driving licence. Pick a level, or take a free drive.</p>
+              <LevelMap player={name} selected={level} onSelect={onLevel} />
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
               <h2>Choose your car</h2>
               <p className="sub">Every car handles differently. The traffic rules are the same for all of them.</p>
               <div className="car-grid" role="radiogroup" aria-label="Car">
@@ -300,7 +344,7 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div>
               <h2>How do you want to see the road?</h2>
               <p className="sub">You can switch any time during the drive with the C key.</p>
@@ -324,7 +368,7 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div>
               <div className="tabs" role="tablist">
                 <button role="tab" aria-selected={learnTab === 'drive'} className={learnTab === 'drive' ? 'on' : ''} onClick={() => setLearnTab('drive')}>
@@ -359,8 +403,9 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
                   <div className="score-start">
                     <div className="big100">100</div>
                     <p>
-                      You start with <b>100 points</b>. Mistakes take points away, good habits win some back (up to 100). Reach
-                      <b> Dharampura (1.8 km)</b> to finish. At <b>0</b> your licence is suspended and the drive ends.
+                      You start with <b>100 points</b>. Mistakes take points away, good habits win some back (up to 100) and earn{' '}
+                      <b>XP</b> toward your rank. Reach the finish arch to complete the level. In a level, falling to <b>0</b> fails it
+                      (just retry!). In Free Drive you get <b>one second chance</b> before your licence is suspended.
                     </p>
                   </div>
                   <div className="score-cols">
@@ -383,7 +428,7 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
                           <li key={text}>
                             <span className="ic">{icon}</span>
                             <span>{text}</span>
-                            <b className="good">+{pts}</b>
+                            <b className="good">{pts ? `+${pts}` : 'XP'}</b>
                           </li>
                         ))}
                       </ul>
@@ -420,7 +465,8 @@ export default function StartScreen({ onStart, error, profile: saved, view, onVi
           <div className="summary">
             {step > 0 && driverOk && (
               <span>
-                {profile.name} · {carObj.name} · {VIEWS.find((v) => v.id === view)?.name}
+                {profile.name} · {level ? `Level ${level}: ${levelById(level).name}` : 'Free Drive'} · {carObj.name} ·{' '}
+                {VIEWS.find((v) => v.id === view)?.name}
               </span>
             )}
           </div>

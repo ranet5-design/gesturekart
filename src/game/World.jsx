@@ -2,7 +2,8 @@
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { game, stepFrame } from './state.js';
-import { LANE_W, ROAD_HALF, ROUTE_LENGTH, NPC_TYPES, carById } from './config.js';
+import { LANE_W, ROAD_HALF, NPC_TYPES, carById } from './config.js';
+import { settings } from './settings.js';
 import PlayerCar from './PlayerCar.jsx';
 import * as tex from './textures.js';
 
@@ -17,26 +18,24 @@ const hash = (n) => {
 };
 const zOf = (s) => -(s - game.s);
 
+// Sky, fog and light for each time of day / weather
+const ENV = {
+  'day-clear': { sky: '#efdcbc', fogNear: 70, fogFar: 340, hemi: 0.9, sun: 1.7, lamps: 0.25 },
+  'day-fog': { sky: '#d9d6cf', fogNear: 15, fogFar: 120, hemi: 1.0, sun: 0.7, lamps: 0.6 },
+  'night-rain': { sky: '#0d1424', fogNear: 25, fogFar: 170, hemi: 0.22, sun: 0.12, lamps: 3 },
+  'night-clear': { sky: '#0b1222', fogNear: 40, fogFar: 260, hemi: 0.25, sun: 0.15, lamps: 3 },
+  'day-rain': { sky: '#9aa3ad', fogNear: 30, fogFar: 180, hemi: 0.7, sun: 0.6, lamps: 0.8 },
+};
+export const envKey = () => `${game.level.env?.time || 'day'}-${game.level.env?.weather || 'clear'}`;
+const envOf = () => ENV[envKey()] || ENV['day-clear'];
+
 export default function World({ runId, car = 'kart' }) {
+  const env = envOf();
   return (
     <>
-      <color attach="background" args={['#efdcbc']} />
-      <fog attach="fog" args={['#efdcbc', 70, 340]} />
-      <hemisphereLight args={['#fff6e5', '#5d7a3c', 0.9]} />
-      <directionalLight
-        castShadow
-        position={[-14, 26, 10]}
-        intensity={1.7}
-        color="#fff0d2"
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-24}
-        shadow-camera-right={24}
-        shadow-camera-top={28}
-        shadow-camera-bottom={-28}
-        shadow-camera-near={1}
-        shadow-camera-far={90}
-        shadow-bias={-0.0004}
-      />
+      <color attach="background" args={[env.sky]} />
+      <fog attach="fog" args={[env.sky, env.fogNear, env.fogFar]} />
+      <Lights />
       <GameLoop />
       <CameraRig />
       <Ground />
@@ -55,10 +54,150 @@ export default function World({ runId, car = 'kart' }) {
         {game.peds.map((p) => (
           <Pedestrian key={p.id} ped={p} />
         ))}
+        {(game.level.zones || []).map((z) => (
+          <ZoneSigns key={z.from} zone={z} />
+        ))}
+        <Arch atS={game.length} lines={['FINISH', `${game.level.route.to} · Civic Score ahead`]} bg="#7a1f2b" />
+        <Arch atS={-2} lines={[game.level.id ? `LEVEL ${game.level.id}` : 'START', `${game.level.route.from} · ${game.level.route.name}`]} bg="#0f5132" />
+        {game.level.env?.weather === 'rain' && <Rain />}
       </group>
-      <Arch atS={ROUTE_LENGTH} lines={['FINISH', 'Dharampura · Civic Score ahead']} bg="#7a1f2b" />
-      <Arch atS={-2} lines={['START', 'Thokar Niaz Baig · Canal Road']} bg="#0f5132" />
       <PlayerCar car={car} color={carById(car).color} />
+    </>
+  );
+}
+
+function Lights() {
+  const hemi = useRef();
+  const sun = useRef();
+  const head = useRef();
+  const target = useMemo(() => new THREE.Object3D(), []);
+  useFrame(() => {
+    const env = envOf();
+    hemi.current.intensity = env.hemi;
+    sun.current.intensity = env.sun;
+    // Headlights at night, in fog and in rain
+    const needLights = env.lamps > 0.5;
+    head.current.intensity = needLights ? 40 : 0;
+    head.current.position.set(game.x, 1.1, -1.8);
+    target.position.set(game.x - game.yaw * 20, 0, -25);
+    target.updateMatrixWorld();
+  });
+  return (
+    <>
+      <hemisphereLight ref={hemi} args={['#fff6e5', '#5d7a3c', 0.9]} />
+      <directionalLight
+        ref={sun}
+        castShadow
+        position={[-14, 26, 10]}
+        intensity={1.7}
+        color="#fff0d2"
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-24}
+        shadow-camera-right={24}
+        shadow-camera-top={28}
+        shadow-camera-bottom={-28}
+        shadow-camera-near={1}
+        shadow-camera-far={90}
+        shadow-bias={-0.0004}
+      />
+      <primitive object={target} />
+      <spotLight ref={head} target={target} angle={0.55} penumbra={0.6} distance={70} decay={1.2} color="#fff4d6" />
+    </>
+  );
+}
+
+function Rain() {
+  const ref = useRef();
+  const N = 1800;
+  const pos = useMemo(() => {
+    const a = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      a[i * 3] = (Math.random() - 0.5) * 40;
+      a[i * 3 + 1] = Math.random() * 14;
+      a[i * 3 + 2] = -Math.random() * 60 + 8;
+    }
+    return a;
+  }, []);
+  useFrame((_, dt) => {
+    const p = ref.current.geometry.attributes.position;
+    for (let i = 0; i < N; i++) {
+      let y = p.array[i * 3 + 1] - dt * 18;
+      let z = p.array[i * 3 + 2] + dt * game.v;
+      if (y < 0) y += 14;
+      if (z > 8) z -= 60;
+      p.array[i * 3 + 1] = y;
+      p.array[i * 3 + 2] = z;
+    }
+    p.needsUpdate = true;
+    ref.current.position.x = game.x;
+  });
+  return (
+    <points ref={ref} frustumCulled={false}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" array={pos} count={N} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial color="#aac4e8" size={0.07} transparent opacity={0.7} />
+    </points>
+  );
+}
+
+// Speed-zone signs: a round limit sign plus a yellow "SCHOOL ZONE" board at the start, "END" at the end
+function ZoneSigns({ zone }) {
+  const startRef = useRef();
+  const endRef = useRef();
+  const mats = useMemo(() => {
+    const limit = tex.makeSign([String(zone.limit), 'km/h'], { bg: '#ffffff', fg: '#111111', accent: '#d62828', w: 256, h: 256 });
+    const board = tex.makeSign([zone.label, 'Slow down · Aahista'], { bg: '#ffd60a', fg: '#111111', accent: '#111111', w: 512, h: 256 });
+    const end = tex.makeSign([`END ${zone.label}`, 'Limit 60'], { bg: '#e9ecef', fg: '#111111', accent: '#495057', w: 512, h: 256 });
+    const road = tex.makeSign([zone.label.split(' ')[0]], { bg: '#3b3d42', fg: '#ffd60a', accent: '#3b3d42', w: 512, h: 128 });
+    return {
+      limit: new THREE.MeshBasicMaterial({ map: limit, toneMapped: false }),
+      board: new THREE.MeshBasicMaterial({ map: board, toneMapped: false }),
+      end: new THREE.MeshBasicMaterial({ map: end, toneMapped: false }),
+      road: new THREE.MeshBasicMaterial({ map: road, transparent: true, opacity: 0.9 }),
+    };
+  }, [zone]);
+  useFrame(() => {
+    const zs = zOf(zone.from);
+    const ze = zOf(zone.to);
+    startRef.current.position.z = zs;
+    startRef.current.visible = zs < 30 && zs > -320;
+    endRef.current.position.z = ze;
+    endRef.current.visible = ze < 30 && ze > -320;
+  });
+  const x = ROAD_HALF + 1.4;
+  return (
+    <>
+      <group ref={startRef}>
+        <mesh position={[x, 1.6, 0]}>
+          <cylinderGeometry args={[0.06, 0.06, 3.2, 6]} />
+          <meshStandardMaterial color="#666" />
+        </mesh>
+        <mesh position={[x, 3.4, 0.05]} material={mats.limit}>
+          <circleGeometry args={[0.55, 32]} />
+        </mesh>
+        <mesh position={[x, 2.35, 0.05]} material={mats.board}>
+          <planeGeometry args={[1.8, 0.9]} />
+        </mesh>
+        <mesh position={[LANE_W, 0.02, -6]} rotation-x={-Math.PI / 2} material={mats.road}>
+          <planeGeometry args={[3, 1.2]} />
+        </mesh>
+        <mesh position={[0, 0.02, -6]} rotation-x={-Math.PI / 2} material={mats.road}>
+          <planeGeometry args={[3, 1.2]} />
+        </mesh>
+        <mesh position={[-LANE_W, 0.02, -6]} rotation-x={-Math.PI / 2} material={mats.road}>
+          <planeGeometry args={[3, 1.2]} />
+        </mesh>
+      </group>
+      <group ref={endRef}>
+        <mesh position={[x, 1.4, 0]}>
+          <cylinderGeometry args={[0.06, 0.06, 2.8, 6]} />
+          <meshStandardMaterial color="#666" />
+        </mesh>
+        <mesh position={[x, 2.6, 0.05]} material={mats.end}>
+          <planeGeometry args={[1.8, 0.9]} />
+        </mesh>
+      </group>
     </>
   );
 }
@@ -71,8 +210,23 @@ function GameLoop() {
 function CameraRig() {
   useFrame((state, dt) => {
     const cam = state.camera;
-    const menu = game.phase === 'menu';
+    const menu = ['menu', 'levels', 'history'].includes(game.phase);
     const t = state.clock.elapsedTime;
+
+    // Replay: a slow cinematic orbit from above and to the side, so you can see what happened
+    if (game.replay) {
+      const a = 0.6 + game.replay.i * 0.004;
+      const k = Math.min(1, dt * 3);
+      cam.position.x += (game.x + Math.sin(a) * 11 - cam.position.x) * k;
+      cam.position.y += (7 - cam.position.y) * k;
+      cam.position.z += (Math.cos(a) * 11 - 2 - cam.position.z) * k;
+      cam.lookAt(game.x, 0.6, -7);
+      if (Math.abs(cam.fov - 55) > 0.05) {
+        cam.fov = 55;
+        cam.updateProjectionMatrix();
+      }
+      return;
+    }
 
     // Driver's seat: eyes just behind the steering wheel, looking down the road
     if (!menu && game.view === 'cockpit') {
@@ -103,7 +257,7 @@ function CameraRig() {
       cam.position.x += (Math.random() - 0.5) * game.shake * 0.6;
       cam.position.y += (Math.random() - 0.5) * game.shake * 0.4;
     }
-    if (wide) cam.lookAt(game.x * 0.5, 0, -20);
+    if (wide) cam.lookAt(game.x * 0.5, -1.5, -13);
     else cam.lookAt(game.x * 0.8, 1.0, -16);
     const fov = wide ? 62 + game.v * 0.3 : 58 + game.v * 0.6;
     if (Math.abs(cam.fov - fov) > 0.05) {
@@ -341,6 +495,10 @@ function Buildings() {
 const LAMP_SP = 30;
 const LAMP_N = 14;
 function Lamps() {
+  const lampMat = useRef();
+  useFrame(() => {
+    if (lampMat.current) lampMat.current.emissiveIntensity = envOf().lamps;
+  });
   const poles = useRef();
   const heads = useRef();
   const dummy = useMemo(() => new THREE.Object3D(), []);
@@ -377,7 +535,7 @@ function Lamps() {
       </instancedMesh>
       <instancedMesh ref={heads} args={[null, null, total]} frustumCulled={false}>
         <boxGeometry args={[2.6, 0.18, 0.4]} />
-        <meshStandardMaterial color="#5c6670" emissive="#fff3c4" emissiveIntensity={0.25} />
+        <meshStandardMaterial ref={lampMat} color="#5c6670" emissive="#fff3c4" emissiveIntensity={0.25} />
       </instancedMesh>
     </>
   );
@@ -481,15 +639,25 @@ function Signal({ sig }) {
     }),
     [],
   );
-  useFrame((state) => {
+  // Colour-blind friendly: a STOP / WAIT / GO word board under the main signal
+  const words = useMemo(
+    () => ({
+      red: new THREE.MeshBasicMaterial({ map: tex.makeSign(['STOP'], { bg: '#d62828', fg: '#fff', accent: '#fff', w: 256, h: 128 }), toneMapped: false }),
+      yellow: new THREE.MeshBasicMaterial({ map: tex.makeSign(['WAIT'], { bg: '#ffb703', fg: '#111', accent: '#111', w: 256, h: 128 }), toneMapped: false }),
+      green: new THREE.MeshBasicMaterial({ map: tex.makeSign(['GO'], { bg: '#2a9d4a', fg: '#fff', accent: '#fff', w: 256, h: 128 }), toneMapped: false }),
+    }),
+    [],
+  );
+  const word = useRef();
+  useFrame(() => {
     const z = zOf(sig.s);
     ref.current.position.z = z;
     ref.current.visible = z < 40 && z > -360;
-    const blink = sig.state === 'yellow' ? 3 : 0;
     mats.red.emissiveIntensity = sig.state === 'red' ? 3 : 0.02;
-    mats.yellow.emissiveIntensity = sig.state === 'yellow' ? blink : 0.02;
+    mats.yellow.emissiveIntensity = sig.state === 'yellow' ? 3 : 0.02;
     mats.green.emissiveIntensity = sig.state === 'green' ? 2.6 : 0.02;
-    void state;
+    word.current.visible = settings.colorblind;
+    word.current.material = words[sig.state];
   });
 
   const zebra = [];
@@ -552,6 +720,9 @@ function Signal({ sig }) {
         <meshStandardMaterial color="#3c4a57" metalness={0.4} roughness={0.5} />
       </mesh>
       {head([1.2, 5.0, 0.4])}
+      <mesh ref={word} position={[1.2, 3.85, 0.45]}>
+        <planeGeometry args={[1.3, 0.62]} />
+      </mesh>
       {head([poleX - 0.35, 3.1, 0.4], 0.8)}
       {/* a second signal on the median for the left lane */}
       <mesh position={[-ROAD_HALF - 0.9, 1.6, 0.4]} castShadow>
@@ -583,12 +754,30 @@ function Npc({ npc }) {
     [],
   );
   const color = useMemo(() => CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)], []);
-  useFrame(() => {
+  const beacon = useMemo(
+    () => [
+      new THREE.MeshStandardMaterial({ color: '#400', emissive: '#ff2020', emissiveIntensity: 0 }),
+      new THREE.MeshStandardMaterial({ color: '#004', emissive: '#2060ff', emissiveIntensity: 0 }),
+    ],
+    [],
+  );
+  const cross = useMemo(
+    () => new THREE.MeshBasicMaterial({ map: tex.makeSign(['+', 'AMBULANCE · 1122'], { bg: '#ffffff', fg: '#d62828', accent: '#d62828', w: 256, h: 256 }) }),
+    [],
+  );
+  const legs = useRef();
+  useFrame((state) => {
     const g = ref.current;
     g.visible = npc.active;
     if (!npc.active) return;
     g.position.set(npc.x, 0, zOf(npc.s));
     tail.emissiveIntensity = npc.braking || npc.v < 0.3 ? 2.2 : 0.3;
+    if (npc.type === 'ambulance') {
+      const on = Math.floor(state.clock.elapsedTime * 6) % 2;
+      beacon[0].emissiveIntensity = on ? 4 : 0.1;
+      beacon[1].emissiveIntensity = on ? 0.1 : 4;
+    }
+    if (npc.type === 'cart' && legs.current) legs.current.rotation.x = Math.sin(state.clock.elapsedTime * 6) * 0.3;
   });
   const spec = NPC_TYPES[npc.type];
   const rear = spec.len / 2;
@@ -641,6 +830,94 @@ function Npc({ npc }) {
         <Wheel position={[0.62, 0.28, 0.85]} r={0.28} w={0.18} />
       </>
     );
+  } else if (npc.type === 'ambulance') {
+    body = (
+      <>
+        <mesh position={[0, 1.2, 0]} castShadow>
+          <boxGeometry args={[2, 1.9, 5.2]} />
+          <meshStandardMaterial color="#f8f9fa" roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 1.0, 0]}>
+          <boxGeometry args={[2.02, 0.25, 5.22]} />
+          <meshStandardMaterial color="#d62828" />
+        </mesh>
+        <mesh position={[0, 1.6, -2.0]}>
+          <boxGeometry args={[1.9, 0.6, 1.2]} />
+          <meshStandardMaterial color="#1b263b" roughness={0.15} metalness={0.5} />
+        </mesh>
+        <mesh position={[-0.45, 2.22, -1.6]} material={beacon[0]}>
+          <boxGeometry args={[0.7, 0.18, 0.35]} />
+        </mesh>
+        <mesh position={[0.45, 2.22, -1.6]} material={beacon[1]}>
+          <boxGeometry args={[0.7, 0.18, 0.35]} />
+        </mesh>
+        <mesh position={[0, 1.4, 2.61]} material={cross}>
+          <planeGeometry args={[1.3, 1.3]} />
+        </mesh>
+        {[-1.7, 1.7].map((z) => (
+          <group key={z}>
+            <Wheel position={[-0.95, 0.38, z]} r={0.38} />
+            <Wheel position={[0.95, 0.38, z]} r={0.38} />
+          </group>
+        ))}
+      </>
+    );
+  } else if (npc.type === 'bike') {
+    // Coming toward the player, so it faces +z
+    body = (
+      <group rotation-y={Math.PI}>
+        <mesh position={[0, 0.6, 0]} castShadow>
+          <boxGeometry args={[0.3, 0.35, 1.5]} />
+          <meshStandardMaterial color="#9d0208" />
+        </mesh>
+        <Wheel position={[0, 0.32, -0.7]} r={0.32} w={0.12} />
+        <Wheel position={[0, 0.32, 0.7]} r={0.32} w={0.12} />
+        <mesh position={[0, 1.15, 0.1]} castShadow>
+          <cylinderGeometry args={[0.2, 0.24, 0.8, 10]} />
+          <meshStandardMaterial color="#457b9d" />
+        </mesh>
+        <mesh position={[0, 1.7, 0.05]} castShadow>
+          <sphereGeometry args={[0.19, 12, 10]} />
+          <meshStandardMaterial color="#a0704f" />
+        </mesh>
+        <mesh position={[0, 0.85, -0.8]}>
+          <sphereGeometry args={[0.11, 10, 8]} />
+          <meshStandardMaterial color="#fff" emissive="#fff6c4" emissiveIntensity={3} />
+        </mesh>
+      </group>
+    );
+  } else if (npc.type === 'cart') {
+    body = (
+      <>
+        {/* donkey in front (-z), cart behind */}
+        <mesh position={[0, 0.95, -1.25]} castShadow>
+          <boxGeometry args={[0.5, 0.55, 1.1]} />
+          <meshStandardMaterial color="#8d7966" />
+        </mesh>
+        <mesh position={[0, 1.35, -1.85]} rotation-x={0.5} castShadow>
+          <boxGeometry args={[0.28, 0.32, 0.55]} />
+          <meshStandardMaterial color="#7a6855" />
+        </mesh>
+        <group ref={legs} position={[0, 0.65, -1.25]}>
+          {[-0.4, 0.4].map((z) => (
+            <mesh key={z} position={[0, -0.3, z]}>
+              <boxGeometry args={[0.4, 0.6, 0.1]} />
+              <meshStandardMaterial color="#5e503f" />
+            </mesh>
+          ))}
+        </group>
+        <mesh position={[0, 0.85, 0.55]} castShadow>
+          <boxGeometry args={[1.4, 0.35, 1.8]} />
+          <meshStandardMaterial color="#a0522d" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, 1.15, 0.6]}>
+          <boxGeometry args={[1.2, 0.3, 1.4]} />
+          <meshStandardMaterial color="#e9c46a" roughness={1} />
+        </mesh>
+        <Wheel position={[-0.75, 0.5, 0.55]} r={0.5} w={0.1} />
+        <Wheel position={[0.75, 0.5, 0.55]} r={0.5} w={0.1} />
+      </>
+    );
   } else {
     body = (
       <>
@@ -665,12 +942,16 @@ function Npc({ npc }) {
     <group ref={ref} visible={false}>
       {body}
       {/* tail lights face the player (who is behind, at +z) */}
-      <mesh position={[-spec.w / 2 + 0.25, npc.type === 'bus' ? 1.1 : 0.75, rear + 0.01]} material={tail}>
-        <boxGeometry args={[0.35, 0.18, 0.04]} />
-      </mesh>
-      <mesh position={[spec.w / 2 - 0.25, npc.type === 'bus' ? 1.1 : 0.75, rear + 0.01]} material={tail}>
-        <boxGeometry args={[0.35, 0.18, 0.04]} />
-      </mesh>
+      {npc.type !== 'bike' && npc.type !== 'cart' && (
+        <>
+          <mesh position={[-spec.w / 2 + 0.25, npc.type === 'bus' ? 1.1 : 0.75, rear + 0.01]} material={tail}>
+            <boxGeometry args={[0.35, 0.18, 0.04]} />
+          </mesh>
+          <mesh position={[spec.w / 2 - 0.25, npc.type === 'bus' ? 1.1 : 0.75, rear + 0.01]} material={tail}>
+            <boxGeometry args={[0.35, 0.18, 0.04]} />
+          </mesh>
+        </>
+      )}
     </group>
   );
 }

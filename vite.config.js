@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: { port: 5173 },
+  test: { environment: 'node', setupFiles: ['tests/setup.js'] },
   build: {
     chunkSizeWarningLimit: 900,
     rollupOptions: {

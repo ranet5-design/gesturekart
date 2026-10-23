@@ -27,7 +27,10 @@ const vis = (p) => (p ? p.visibility ?? 1 : 0);
  *   haltRaw  right hand raised above the head this frame
  */
 export function readGesture(lm, aspect = 4 / 3) {
-  const out = { visible: false, held: false, angle: 0, lift: 0.5, haltRaw: false, lean: 0 };
+  const out = {
+    visible: false, held: false, angle: 0, lift: 0.5, haltRaw: false, lean: 0,
+    sw: 0, span: 0, indicator: null, beltReach: false, beltDown: false,
+  };
   if (!lm) return out;
   const ls = lm[L_SHOULDER];
   const rs = lm[R_SHOULDER];
@@ -35,33 +38,54 @@ export function readGesture(lm, aspect = 4 / 3) {
   out.visible = true;
 
   const sw = Math.hypot((ls.x - rs.x) * aspect, ls.y - rs.y) || 0.2; // shoulder width = body-size unit
+  out.sw = sw;
   const shoulderY = (ls.y + rs.y) / 2;
   const nose = lm[NOSE];
   const lw = lm[L_WRIST];
   const rw = lm[R_WRIST];
+  const le = lm[L_ELBOW];
+  const re = lm[R_ELBOW];
+
+  // Mirror x so "left" means the driver's left, like looking through the windscreen.
+  const mx = (p) => (1 - p.x) * aspect;
+  const SLx = mx(ls);
+  const SRx = mx(rs);
+
+  // Torso lean (from the brief): shoulder line tilt. + = leaning right. Works without hands in view.
+  out.lean = clamp(Math.atan2(rs.y - ls.y, SRx - SLx) / 0.35, -1.5, 1.5);
 
   // Brake: right hand clearly above the head. If the hand goes past the top of the frame,
   // a raised right elbow still counts.
-  const re = lm[R_ELBOW];
   out.haltRaw =
     (vis(rw) > 0.5 && vis(nose) > 0.5 && rw.y < nose.y - sw * 0.1) ||
     (vis(rw) < 0.5 && vis(re) > 0.5 && re.y < rs.y - sw * 0.35);
 
-  const bothHands = vis(lw) > 0.5 && vis(rw) > 0.5;
-  if (!bothHands || out.haltRaw) return out;
+  // Indicator: stretch one arm straight out to the side at shoulder height
+  const armOut = (w, e, sx, sy, dir) => {
+    const beyond = (p) => (dir < 0 ? sx - mx(p) : mx(p) - sx);
+    const wristOut = vis(w) > 0.5 && beyond(w) > sw * 1.05 && Math.abs(w.y - sy) < sw * 0.7;
+    const elbowOut = vis(e) > 0.5 && beyond(e) > sw * 0.55 && Math.abs(e.y - sy) < sw * 0.5 && vis(w) < 0.5;
+    return wristOut || elbowOut;
+  };
+  if (armOut(lw, le, SLx, ls.y, -1)) out.indicator = 'left';
+  else if (!out.haltRaw && armOut(rw, re, SRx, rs.y, 1)) out.indicator = 'right';
 
-  // Mirror x so "left" means the driver's left, like looking through the windscreen.
-  const Lx = (1 - lw.x) * aspect;
-  const Rx = (1 - rw.x) * aspect;
+  // Seatbelt: right hand reaches over to the left shoulder, then pulls down to the right hip
+  if (vis(rw) > 0.5) {
+    out.beltReach = Math.hypot(mx(rw) - SLx, rw.y - ls.y) < sw * 0.6;
+    out.beltDown = rw.y > shoulderY + sw * 1.0 && mx(rw) > (SLx + SRx) / 2;
+  }
+
+  const bothHands = vis(lw) > 0.5 && vis(rw) > 0.5;
+  if (!bothHands || out.haltRaw || out.indicator) return out;
+
+  const Lx = mx(lw);
+  const Rx = mx(rw);
   const span = Math.hypot(Rx - Lx, rw.y - lw.y) / sw;
+  out.span = span;
   const lowest = Math.max(lw.y, rw.y);
   // Hands roughly a wheel-width apart and not resting down in the lap
   out.held = span > 0.45 && span < 4 && lowest < shoulderY + sw * 1.5;
-
-  // Torso lean (from the brief): shoulder line tilt, mirrored like the wheel. + = leaning right.
-  const SLx = (1 - ls.x) * aspect;
-  const SRx = (1 - rs.x) * aspect;
-  out.lean = clamp(Math.atan2(rs.y - ls.y, SRx - SLx) / 0.35, -1.5, 1.5);
 
   if (!out.held) return out;
 
@@ -131,3 +155,37 @@ export function combineSteer(wheelSteer, lean) {
 
 // Wheel height -> gas. Chest height is a normal ~45 km/h, shoulder height is fast.
 export const liftToThrottle = (lift) => 0.25 + 0.65 * lift;
+
+// Hand distance -> gas (the brief's "distance between hands" control). 1 shoulder-width = slow, 2.6 = full.
+export const spanToThrottle = (span) => clamp((span - 0.8) / (2.6 - 0.8), 0.1, 1);
+
+// Lean forward / back -> gas: shoulders look wider when you lean toward the camera.
+export const leanFwdToThrottle = (sw, baseSw) => (baseSw > 0 ? clamp(0.55 + (sw / baseSw - 1) * 2.5, 0.15, 1) : 0.55);
+
+/**
+ * One-hand mode: a single raised hand steers by moving left/right in front of the chest,
+ * sets speed by its height, and brakes by going above the head.
+ */
+export function readOneHand(lm, aspect = 4 / 3) {
+  const out = { held: false, steer: 0, lift: 0.5, haltRaw: false };
+  if (!lm) return out;
+  const ls = lm[L_SHOULDER];
+  const rs = lm[R_SHOULDER];
+  if (vis(ls) < 0.5 || vis(rs) < 0.5) return out;
+  const sw = Math.hypot((ls.x - rs.x) * aspect, ls.y - rs.y) || 0.2;
+  const shoulderY = (ls.y + rs.y) / 2;
+  const midX = (1 - (ls.x + rs.x) / 2) * aspect;
+  const nose = lm[NOSE];
+  const w = vis(lm[R_WRIST]) > 0.5 ? lm[R_WRIST] : vis(lm[L_WRIST]) > 0.5 ? lm[L_WRIST] : null;
+  if (!w) return out;
+  if (vis(nose) > 0.5 && w.y < nose.y - sw * 0.1) {
+    out.haltRaw = true;
+    return out;
+  }
+  out.held = w.y < shoulderY + sw * 1.6;
+  if (!out.held) return out;
+  const dx = ((1 - w.x) * aspect - midX) / (sw * 0.9);
+  out.steer = Math.abs(dx) < 0.15 ? 0 : clamp((Math.abs(dx) - 0.15) / 0.85, 0, 1) * Math.sign(dx);
+  out.lift = clamp((shoulderY + sw * 1.3 - w.y) / (sw * 1.3), 0, 1);
+  return out;
+}

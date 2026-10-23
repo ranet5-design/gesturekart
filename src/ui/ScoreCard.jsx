@@ -3,10 +3,23 @@ import { coachTips, downloadPDF, downloadPNG, fmtTime, kmhAt, breakdown, endSumm
 import { SPEED_LIMIT_KMH } from '../game/config.js';
 import { ordinal } from '../game/history.js';
 import History from './History.jsx';
+import SkillRadar, { weakestSkill, PRACTICE_FOR } from './SkillRadar.jsx';
+import { SKILL_NAMES } from '../game/rules.js';
+import { LEVELS } from '../game/levels.js';
+import { shareCard, whatsappUrl, linkedinUrl } from '../report/card.js';
 
 const tone = (s) => (s >= 85 ? 'good' : s >= 55 ? 'warn' : 'bad');
 
-export default function ScoreCard({ report: r, onAgain, onMenu }) {
+export default function ScoreCard({ report: r, onAgain, onMenu, onNext }) {
+  const [shareMsg, setShareMsg] = useState('');
+  const lr = r.levelResult;
+  const pg = r.progress;
+  const nextLevel = lr?.passed && r.levelId < LEVELS.length ? r.levelId + 1 : null;
+  const delta = r.prevScore == null ? null : r.score - r.prevScore;
+  const doShare = async () => {
+    const res = await shareCard(r);
+    setShareMsg(res === 'shared' ? 'Shared!' : 'Choose where to share:');
+  };
   const [busy, setBusy] = useState('');
   const [tab, setTab] = useState('summary');
   const run = async (kind, fn) => {
@@ -17,8 +30,15 @@ export default function ScoreCard({ report: r, onAgain, onMenu }) {
       setBusy('');
     }
   };
-  const title =
-    r.reason === 'finish' ? 'You reached Dharampura! 🏁' : r.reason === 'suspended' ? 'Licence suspended' : 'Drive ended';
+  const title = lr
+    ? lr.passed
+      ? `Level ${r.levelId} cleared! ${'★'.repeat(lr.stars)}`
+      : `Level ${r.levelId} not passed yet`
+    : r.reason === 'finish'
+      ? `You reached ${r.routeTo}! 🏁`
+      : r.reason === 'suspended'
+        ? 'Licence suspended'
+        : 'Drive ended';
   const rk = r.rank;
   const lost = breakdown(r.events).filter((b) => b.points < 0);
   const won = breakdown(r.events).filter((b) => b.points > 0);
@@ -80,6 +100,105 @@ export default function ScoreCard({ report: r, onAgain, onMenu }) {
 
         {tab === 'summary' && (
           <>
+            {pg?.licenceEarned && (
+              <div className="licence-cert">
+                <span className="lc-icon">🪪</span>
+                <div>
+                  <b>Congratulations! You earned your GestureKart Driving Licence</b>
+                  <p>
+                    All 8 levels cleared by {r.player}. Share it, then try to get 3 stars on every level. (A game licence, not an
+                    official one: for a real licence, visit your local traffic police licensing centre.)
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="progress-row">
+              {lr && (
+                <div className={`level-result ${lr.passed ? 'pass' : 'fail'}`}>
+                  <div className="lr-head">
+                    <b>{lr.passed ? '✅ Passed' : '❌ Not passed'}</b>
+                    <span className="stars big">
+                      {[1, 2, 3].map((i) => (
+                        <i key={i} className={i <= lr.stars ? 'on' : ''}>
+                          ★
+                        </i>
+                      ))}
+                    </span>
+                  </div>
+                  <ul>
+                    {lr.checks.map((c) => (
+                      <li key={c.id} className={c.ok ? 'ok' : 'no'}>
+                        {c.ok ? '✓' : '✗'} {c.text}
+                        {!c.ok && c.have && <small> (you: {c.have})</small>}
+                      </li>
+                    ))}
+                  </ul>
+                  {r.failReason && <p className="exam">Examiner stopped the test: {r.failReason}.</p>}
+                  {!lr.passed && <p className="tip-line">Fix the ✗ items above and try again. You've got this!</p>}
+                  {lr.passed && lr.stars < 3 && <p className="tip-line">Want more stars? Score 85+ for ★★ and 95+ (fully focused) for ★★★.</p>}
+                </div>
+              )}
+              {pg && (
+                <div className="xp-box">
+                  <div className="xp-total">
+                    <b>+{pg.earned} XP</b>
+                    <span>
+                      {pg.rank.name}
+                      {pg.rankUp ? ' · RANK UP! 🎉' : ''}
+                    </span>
+                  </div>
+                  <div className="xp-bar">
+                    <i style={{ width: `${Math.round(pg.rank.pct * 100)}%` }} />
+                  </div>
+                  <small>{pg.rank.next ? `${pg.rank.toNext} XP to ${pg.rank.next.name}` : 'Top rank reached'}</small>
+                  <ul>
+                    {pg.xp.map((x) => (
+                      <li key={x.label}>
+                        <span>{x.label}</span>
+                        <b>+{x.xp}</b>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="chips">
+                    <span className="chip fire">🔥 {pg.streak}-day streak</span>
+                    <span className={`chip ${pg.challengeDone ? 'done' : ''}`}>
+                      🎯 {pg.challenge.text} {pg.challengeDone ? '✓ done!' : ''}
+                    </span>
+                    {pg.unlocked && <span className="chip done">🔓 Level {pg.unlocked} unlocked</span>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="moments">
+              {r.bestMoment && (
+                <div className="moment good">
+                  <span>🌟 Best moment</span>
+                  <b>
+                    {fmtTime(r.bestMoment.t)} · {r.bestMoment.label}
+                    {r.bestMoment.combo > 1 ? ` (combo x${r.bestMoment.combo})` : ''}
+                  </b>
+                </div>
+              )}
+              {delta != null && (
+                <div className={`moment ${delta >= 0 ? 'good' : 'bad'}`}>
+                  <span>📈 Compared with last time</span>
+                  <b>
+                    {delta > 0 ? `+${delta} points better!` : delta === 0 ? 'Same score as last time' : `${delta} points. You can beat it!`}
+                  </b>
+                </div>
+              )}
+              {r.attention != null && (
+                <div className={`moment ${r.attention >= 90 ? 'good' : 'bad'}`}>
+                  <span>👁 Attention</span>
+                  <b>
+                    {r.attention}% of the drive focused{r.focusAlerts ? ` · ${r.focusAlerts} warning(s)` : ''}
+                  </b>
+                </div>
+              )}
+            </div>
+
             <div className="stat-grid">
               <Stat k="Distance" v={`${(r.distance / 1000).toFixed(2)} km`} sub={`of ${(r.routeLength / 1000).toFixed(1)} km`} />
               <Stat k="Avg / top speed" v={`${Math.round(r.avgKmh)} / ${Math.round(r.maxKmh)}`} sub="km/h" />
@@ -129,6 +248,25 @@ export default function ScoreCard({ report: r, onAgain, onMenu }) {
                 </ul>
               </div>
             </div>
+
+            <div className="skills-row">
+              <SkillRadar skills={r.skills} light />
+              <div>
+                <h3>Your driving skills</h3>
+                {(() => {
+                  const w = weakestSkill(r.skills);
+                  return w ? (
+                    <p>
+                      Work on <b>{SKILL_NAMES[w.k]}</b> ({w.v}/100). Level {PRACTICE_FOR[w.k]} (
+                      {LEVELS[PRACTICE_FOR[w.k] - 1].name}) trains exactly this.
+                    </p>
+                  ) : (
+                    <p>Every skill tested is 85 or above. Excellent, well-rounded driving!</p>
+                  );
+                })()}
+                <p className="muted">Skills are worked out from this drive. "–" means the drive didn't test that skill.</p>
+              </div>
+            </div>
           </>
         )}
 
@@ -143,14 +281,40 @@ export default function ScoreCard({ report: r, onAgain, onMenu }) {
           <button className="secondary" disabled={!!busy} onClick={() => run('png', downloadPNG)}>
             {busy === 'png' ? 'Preparing…' : '🖼 Download image'}
           </button>
+          <button className="secondary" onClick={doShare}>
+            📤 Share
+          </button>
           <span className="spacer" />
+          {nextLevel && (
+            <button className="primary" onClick={() => onNext(nextLevel)}>
+              Next: Level {nextLevel} →
+            </button>
+          )}
           <button className="secondary" onClick={onAgain}>
-            ↻ Drive again
+            ↻ {lr && !lr.passed ? 'Try again' : 'Drive again'}
           </button>
           <button className="ghost" onClick={onMenu}>
             Menu
           </button>
         </div>
+        {shareMsg && (
+          <div className="share-row">
+            <span>{shareMsg}</span>
+            {shareMsg !== 'Shared!' && (
+              <>
+                <a className="secondary" href={whatsappUrl(r)} target="_blank" rel="noopener noreferrer">
+                  WhatsApp
+                </a>
+                <a className="secondary" href={linkedinUrl()} target="_blank" rel="noopener noreferrer">
+                  LinkedIn
+                </a>
+                <button className="ghost" onClick={() => run('png', downloadPNG)}>
+                  Save image
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

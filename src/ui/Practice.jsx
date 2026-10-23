@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { input, updateKeyboard, keyDown } from '../cv/input.js';
-import { beginCalibration, endCalibration } from '../cv/pose.js';
+import { beginCalibration, endCalibration, resetSeatbelt } from '../cv/pose.js';
+import { settings } from '../game/settings.js';
 import { chime } from '../audio/sound.js';
 import { say } from '../audio/voice.js';
 import CameraPanel from './CameraPanel.jsx';
@@ -30,10 +31,19 @@ const CAM_STEPS = [
   },
   {
     id: 'lift',
+    title: 'Lower the wheel to slow down',
+    ur: 'Wheel neeche (pait ki taraf) = aahista',
+    test: () => input.wheelHeld && input.wheelLift < 0.3,
+    need: 0.4,
+    speed: ['auto'],
+  },
+  {
+    id: 'lift-up',
     title: 'Lift the wheel up to go faster',
     ur: 'Wheel upar = tez, neeche = aahista',
     test: () => input.wheelHeld && input.wheelLift > 0.72,
     need: 0.4,
+    speed: ['lift'],
   },
   {
     id: 'brake',
@@ -44,20 +54,64 @@ const CAM_STEPS = [
   },
 ];
 
+const CAM_INDICATORS = [
+  {
+    id: 'ind-left',
+    title: 'Left indicator: left arm straight out',
+    ur: 'Baayan baazu side mein seedha bahar',
+    test: () => lastIndicator === 'left',
+    need: 0.01,
+  },
+  {
+    id: 'ind-right',
+    title: 'Right indicator: right arm straight out',
+    ur: 'Daayan baazu side mein seedha bahar',
+    test: () => lastIndicator === 'right',
+    need: 0.01,
+  },
+];
+const CAM_BELT = {
+  id: 'belt',
+  title: 'Fasten your seatbelt',
+  ur: 'Daayan haath baayen kandhe par, phir neeche daayen kulhe tak kheenchein',
+  test: () => input.seatbelt,
+  need: 0.01,
+};
+
 const KEY_STEPS = [
+  { id: 'belt', title: 'Fasten your seatbelt', ur: 'B dabaayein', keys: ['B'], test: () => input.seatbelt, need: 0.01 },
   { id: 'left', title: 'Steer left', ur: '← arrow dabaayein', keys: ['←'], test: () => keyDown('arrowleft') || keyDown('a'), need: 0.3 },
   { id: 'right', title: 'Steer right', ur: '→ arrow dabaayein', keys: ['→'], test: () => keyDown('arrowright') || keyDown('d'), need: 0.3 },
   { id: 'lift', title: 'Speed up', ur: '↑ arrow dabaayein (↓ se aahista)', keys: ['↑'], test: () => keyDown('arrowup') || keyDown('w'), need: 0.3 },
   { id: 'brake', title: 'Brake', ur: 'Space bar dabaayein', keys: ['Space'], test: () => keyDown(' '), need: 0.3 },
 ];
+const KEY_INDICATORS = [
+  { id: 'ind-left', title: 'Left indicator', ur: 'Q dabaayein', keys: ['Q'], test: () => lastIndicator === 'left', need: 0.01 },
+  { id: 'ind-right', title: 'Right indicator', ur: 'E dabaayein', keys: ['E'], test: () => lastIndicator === 'right', need: 0.01 },
+];
+
+// The indicator is a one-shot signal; remember the last one seen during practice
+let lastIndicator = null;
+
+function buildSteps(camera, short, level) {
+  if (!camera) return [...KEY_STEPS, ...(level?.indicators ? KEY_INDICATORS : [])];
+  if (short) return [CAM_STEPS[0], CAM_BELT];
+  const speedOk = (s) => !s.speed || s.speed.includes(settings.speedMode);
+  return [...CAM_STEPS.filter(speedOk), ...(level?.indicators ? CAM_INDICATORS : []), CAM_BELT];
+}
 
 /**
  * Guided practice before every drive. With the webcam, nothing can start until the body lock is at 100%.
- * `short` skips straight to the "hold the wheel" check for players who already practised this session.
+ * `short` skips straight to "hold the wheel" + seatbelt for players who already practised this session.
  */
-export default function Practice({ mode, short = false, onDone, onBack }) {
+export default function Practice({ mode, short = false, level, onDone, onBack }) {
   const camera = mode === 'camera';
-  const steps = camera ? (short ? CAM_STEPS.slice(0, 1) : CAM_STEPS) : KEY_STEPS;
+  const [steps] = useState(() => {
+    lastIndicator = null;
+    input.seatbelt = false;
+    resetSeatbelt();
+    return buildSteps(camera, short, level);
+  });
   const st = useRef({ idx: 0, hold: 0, calib: false, finished: false, wasLocked: false });
   const [v, setV] = useState({ idx: 0, prog: 0, lock: 0, locked: false, issue: '', parts: 0 });
 
@@ -76,6 +130,10 @@ export default function Practice({ mode, short = false, onDone, onBack }) {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       updateKeyboard(dt);
+      if (input.indicator) {
+        lastIndicator = input.indicator;
+        input.indicator = null;
+      }
       const s = st.current;
       const lockOk = !camera || input.locked;
 

@@ -11,6 +11,13 @@ export const EVENT_INFO = {
   unsafeLane: { label: 'Unsafe lane changes', bad: true },
   goodStop: { label: 'Proper stops at red', bad: false },
   cleanLane: { label: 'Clean lane changes', bad: false },
+  noIndicator: { label: 'Lane changes without indicator', bad: true },
+  noYield: { label: 'Blocked an ambulance', bad: true },
+  wrongWay: { label: 'Hit a wrong-way biker', bad: true },
+  focus: { label: 'Focus warnings (drowsy / distracted)', bad: true },
+  gaveWay: { label: 'Gave way to an ambulance', bad: false },
+  avoided: { label: 'Dodged a wrong-way biker', bad: false },
+  seatbelt: { label: 'Seatbelt fastened', bad: false },
 };
 
 // Speed at any moment, interpolated from the 4-per-second telemetry (so event dots sit on the line)
@@ -42,10 +49,11 @@ export function breakdown(events) {
 
 // One sentence explaining how the drive ended
 export function endSummary(r) {
-  if (r.reason === 'finish') return `You drove the full ${(r.routeLength / 1000).toFixed(1)} km to Dharampura.`;
+  if (r.reason === 'finish') return `You drove the full ${(r.routeLength / 1000).toFixed(1)} km to ${r.routeTo || 'the finish'}.`;
   const worst = breakdown(r.events).filter((b) => b.points < 0).slice(0, 2);
   const why = worst.map((b) => `${b.count} × ${EVENT_INFO[b.type]?.label.toLowerCase() || b.type}`).join(' and ');
-  if (r.reason === 'suspended') return `Your score reached 0 after ${(r.distance / 1000).toFixed(2)} km${why ? `, mostly from ${why}` : ''}.`;
+  if (r.reason === 'failed' && r.failReason) return `The examiner stopped the test after ${(r.distance / 1000).toFixed(2)} km: ${r.failReason.toLowerCase()}.`;
+  if (r.reason === 'suspended' || r.reason === 'failed') return `Your score reached 0 after ${(r.distance / 1000).toFixed(2)} km${why ? `, mostly from ${why}` : ''}.`;
   return `You ended the drive after ${(r.distance / 1000).toFixed(2)} km.`;
 }
 
@@ -64,7 +72,10 @@ export function coachTips(r) {
   if (c.crash) tips.push('Leave a gap of at least two seconds to the vehicle ahead. Rickshaws and buses stop suddenly.');
   if (c.overspeed) tips.push(`Canal Road is limited to ${SPEED_LIMIT_KMH} km/h. Hold the wheel a little lower to slow down.`);
   if (c.tailgate) tips.push('You followed too closely. Ease off and let the gap grow before overtaking.');
-  if (c.straddle || c.unsafeLane) tips.push('Pick a lane and commit. Change lanes in one smooth lean, never near a crossing.');
+  if (c.straddle || c.unsafeLane) tips.push('Pick a lane and commit. Change lanes in one smooth turn of the wheel, never near a crossing.');
+  if (c.noIndicator) tips.push('Stretch your arm out sideways for a second before every lane change. That is your indicator.');
+  if (c.noYield) tips.push('When you hear a siren, move to another lane straight away. Every second counts for the patient.');
+  if (c.focus) tips.push('You lost focus while driving. Get proper sleep, take breaks, and keep your phone away.');
   if (r.reason !== 'finish') tips.push('Finish the full route to earn a complete score.');
   if (!tips.length) tips.push('Excellent discipline. You obeyed every signal and kept your lane. Share your score and challenge a friend!');
   return tips.slice(0, 4);
@@ -157,7 +168,12 @@ export async function drawCard(r) {
   const endText =
     r.reason === 'finish' ? 'Completed the full route' : r.reason === 'suspended' ? 'Drive ended: licence suspended' : 'Drive ended early';
   ctx.fillText(`${endText} · ${r.mode === 'camera' ? 'Webcam gesture control' : 'Keyboard control'}`, 70, 470);
-  const details = [r.age ? `Age ${r.age}` : '', r.cnic ? `CNIC ${r.cnic}` : '', r.carName || ''].filter(Boolean).join(' · ');
+  const lvl = r.levelId
+    ? `Level ${r.levelId} ${r.levelName}${r.levelResult ? (r.levelResult.passed ? ` passed ${'★'.repeat(r.levelResult.stars)}` : ' not passed') : ''}`
+    : 'Free Drive';
+  const details = [lvl, r.age ? `Age ${r.age}` : '', r.cnic ? `CNIC ${r.cnic}` : '', r.carName || '', r.attention != null ? `Focus ${r.attention}%` : '']
+    .filter(Boolean)
+    .join(' · ');
   if (details) ctx.fillText(details, 70, 505);
   if (r.rank) {
     // Ranking goes in the dark header band, under the date
@@ -347,6 +363,33 @@ export async function drawCard(r) {
 function fileBase(r) {
   return `GestureKart-Civic-Score-${r.player.replace(/[^a-z0-9]+/gi, '-')}`;
 }
+
+const SITE = 'https://gesturekart.vercel.app';
+
+export function shareText(r) {
+  const where = r.levelId ? `Level ${r.levelId} (${r.levelName})` : 'Canal Road';
+  return `I scored ${r.score}/100 (grade ${r.grade}) on ${where} in GestureKart, a webcam gesture driving game that teaches traffic rules. Can you beat me? ${SITE}`;
+}
+
+/** Share the score card image via the phone/OS share sheet, or fall back to WhatsApp + a download. */
+export async function shareCard(r) {
+  const c = await drawCard(r);
+  const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
+  const file = new File([blob], `${fileBase(r)}.png`, { type: 'image/png' });
+  const text = shareText(r);
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'My GestureKart score', text });
+      return 'shared';
+    } catch {
+      /* cancelled: fall through */
+    }
+  }
+  return 'fallback';
+}
+
+export const whatsappUrl = (r) => `https://wa.me/?text=${encodeURIComponent(shareText(r))}`;
+export const linkedinUrl = () => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(SITE)}`;
 
 export async function downloadPNG(r) {
   const c = await drawCard(r);

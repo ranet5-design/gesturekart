@@ -23,6 +23,13 @@ export const POINTS = {
   tailgate: -3,
   goodStop: 8,
   cleanLane: 4,
+  noIndicator: -3,
+  noYield: -8,
+  gaveWay: 6,
+  avoided: 4,
+  focus: -5,
+  wrongWay: -15,
+  seatbelt: 2,
 };
 
 /* The five cars a player can pick. Handling numbers:
@@ -61,4 +68,7 @@ export const NPC_TYPES = {
   car: { len: 4.2, w: 1.8 },
   rickshaw: { len: 2.8, w: 1.4 },
   bus: { len: 9, w: 2.5 },
+  ambulance: { len: 5.2, w: 2 },
+  bike: { len: 1.9, w: 0.8 },
+  cart: { len: 3.2, w: 1.5 },
 };

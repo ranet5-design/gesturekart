@@ -29,7 +29,7 @@ export function Wheel({ angle = 0, held = true, halt = false, size = 160 }) {
 }
 
 /** Circular body-lock meter: 0..1 */
-export function LockRing({ value = 0, locked = false, size = 120 }) {
+export function LockRing({ value = 0, locked = false, size = 120, label }) {
   const r = 52;
   const c = 2 * Math.PI * r;
   const pct = Math.round(value * 100);
@@ -49,7 +49,7 @@ export function LockRing({ value = 0, locked = false, size = 120 }) {
       </svg>
       <div className="lock-label">
         <b>{pct}%</b>
-        <span>{locked ? 'Locked' : 'Body lock'}</span>
+        <span>{label || (locked ? 'Locked' : 'Body lock')}</span>
       </div>
     </div>
   );
