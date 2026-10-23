@@ -13,6 +13,42 @@ export const EVENT_INFO = {
   cleanLane: { label: 'Clean lane changes', bad: false },
 };
 
+// Speed at any moment, interpolated from the 4-per-second telemetry (so event dots sit on the line)
+export function kmhAt(tel, t) {
+  if (!tel.length) return 0;
+  if (t <= tel[0].t) return tel[0].kmh;
+  for (let i = 1; i < tel.length; i++) {
+    if (tel[i].t >= t) {
+      const a = tel[i - 1];
+      const b = tel[i];
+      const k = (t - a.t) / (b.t - a.t || 1);
+      return a.kmh + (b.kmh - a.kmh) * k;
+    }
+  }
+  return tel[tel.length - 1].kmh;
+}
+
+// Points lost / won per kind of event, biggest first
+export function breakdown(events) {
+  const map = new Map();
+  for (const e of events) {
+    const cur = map.get(e.type) || { type: e.type, count: 0, points: 0 };
+    cur.count++;
+    cur.points += e.points;
+    map.set(e.type, cur);
+  }
+  return [...map.values()].sort((a, b) => a.points - b.points);
+}
+
+// One sentence explaining how the drive ended
+export function endSummary(r) {
+  if (r.reason === 'finish') return `You drove the full ${(r.routeLength / 1000).toFixed(1)} km to Dharampura.`;
+  const worst = breakdown(r.events).filter((b) => b.points < 0).slice(0, 2);
+  const why = worst.map((b) => `${b.count} × ${EVENT_INFO[b.type]?.label.toLowerCase() || b.type}`).join(' and ');
+  if (r.reason === 'suspended') return `Your score reached 0 after ${(r.distance / 1000).toFixed(2)} km${why ? `, mostly from ${why}` : ''}.`;
+  return `You ended the drive after ${(r.distance / 1000).toFixed(2)} km.`;
+}
+
 export function fmtTime(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -121,6 +157,21 @@ export async function drawCard(r) {
   const endText =
     r.reason === 'finish' ? 'Completed the full route' : r.reason === 'suspended' ? 'Drive ended: licence suspended' : 'Drive ended early';
   ctx.fillText(`${endText} · ${r.mode === 'camera' ? 'Webcam gesture control' : 'Keyboard control'}`, 70, 470);
+  const details = [r.age ? `Age ${r.age}` : '', r.cnic ? `CNIC ${r.cnic}` : '', r.carName || ''].filter(Boolean).join(' · ');
+  if (details) ctx.fillText(details, 70, 505);
+  if (r.rank) {
+    // Ranking goes in the dark header band, under the date
+    const rk = r.rank;
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#facc15';
+    ctx.font = F(700, 22);
+    ctx.fillText(
+      `${rk.isPersonalBest && !rk.firstDrive ? '★ New personal best · ' : ''}#${rk.personal} of your ${rk.personalOf} drives · #${rk.boardPos} of ${rk.boardOf} players`,
+      W - 70,
+      188,
+    );
+    ctx.textAlign = 'left';
+  }
 
   // Score ring
   const cx = W - 220;
@@ -225,7 +276,7 @@ export async function drawCard(r) {
     ctx.stroke();
   }
   r.events.forEach((e) => {
-    const k = tel.find((p) => p.t >= e.t)?.kmh ?? 0;
+    const k = kmhAt(tel, e.t);
     ctx.fillStyle = e.points < 0 ? '#dc2626' : '#16a34a';
     ctx.beginPath();
     ctx.arc(X(e.t), Y(k), 9, 0, Math.PI * 2);

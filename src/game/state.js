@@ -1,5 +1,5 @@
 import {
-  LANES, ROAD_HALF, CAR_LEN, CAR_W, MAX_SPEED, SPEED_LIMIT_KMH,
+  LANES, ROAD_HALF, CAR_LEN, CAR_W, SPEED_LIMIT_KMH, carById,
   ROUTE_LENGTH, ROUTE_NAME, POINTS, NPC_TYPES,
 } from './config.js';
 import { input, updateKeyboard } from '../cv/input.js';
@@ -10,11 +10,43 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const NPC_SLOTS = ['car', 'rickshaw', 'car', 'bus', 'rickshaw', 'car', 'rickshaw', 'car', 'car', 'rickshaw'];
 
+// Camera views the player can pick before (or during, with C) the drive
+export const VIEWS = [
+  { id: 'cockpit', name: 'Driver seat', ur: 'Steering aapke saamne', desc: 'Sit inside the kart with the steering wheel in front of you.' },
+  { id: 'chase', name: 'Behind the car', ur: 'Gaari ke peeche se', desc: 'Classic view from just behind your kart.' },
+  { id: 'wide', name: 'Wide angle', ur: 'Upar se, door tak', desc: 'High, wide view to see signals and traffic early.' },
+];
+const VIEW_KEY = 'gesturekart.view';
+function loadView() {
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    return VIEWS.some((x) => x.id === v) ? v : 'cockpit';
+  } catch {
+    return 'cockpit';
+  }
+}
+export function setView(id) {
+  if (!VIEWS.some((x) => x.id === id)) return;
+  game.view = id;
+  try {
+    localStorage.setItem(VIEW_KEY, id);
+  } catch {
+    /* preference just won't be remembered */
+  }
+}
+export function nextView() {
+  const i = VIEWS.findIndex((x) => x.id === game.view);
+  setView(VIEWS[(i + 1) % VIEWS.length].id);
+  return game.view;
+}
+
 /* All live game data lives in this one mutable object. The 3D scene and HUD read it;
    only this file writes to it. React re-renders are avoided during play for smooth 60 FPS. */
 export const game = {
   phase: 'menu', // menu | loading | practice | countdown | playing | paused | over
-  view: 'cockpit', // 'cockpit' (driver's seat) | 'chase' (behind the car)
+  view: loadView(), // see VIEWS
+  car: 'kart', // see CARS in config.js
+  profile: { age: null, cnicMasked: '' },
   runId: 0,
   player: 'Driver',
   mode: 'keyboard',
@@ -313,8 +345,9 @@ export function stepFrame(dt) {
 
   // ---- Player longitudinal motion ----
   const halt = input.halt;
-  const target = halt ? 0 : input.throttle * MAX_SPEED;
-  const accel = halt ? 11 : target > game.v ? 5 : 4;
+  const car = carById(game.car);
+  const target = halt ? 0 : input.throttle * (car.top / 3.6);
+  const accel = halt ? car.brake : target > game.v ? car.accel : car.accel * 0.8;
   game.v = Math.max(0, game.v + clamp(target - game.v, -accel * dt, accel * dt));
   game.braking = halt || target < game.v - 0.5;
 
@@ -326,7 +359,7 @@ export function stepFrame(dt) {
     // Gentle lane-keep assist pulls you to the centre of your lane when you sit upright
     vx = clamp(LANES[nearestIdx] - game.x, -1, 1) * 1.8;
   } else {
-    vx = steer * (3 + game.v * 0.28);
+    vx = steer * (3 + game.v * 0.28) * car.steer;
   }
   vx *= clamp(game.v / 3, 0, 1); // can't slide sideways when stopped
   game.x = clamp(game.x + vx * dt, -ROAD_HALF + 1, ROAD_HALF - 1);
@@ -486,6 +519,11 @@ export function buildReport() {
     route: ROUTE_NAME,
     reason: game.endReason,
     mode: game.mode,
+    view: game.view,
+    car: game.car,
+    carName: carById(game.car).name,
+    age: game.profile.age,
+    cnic: game.profile.cnicMasked,
     score,
     ...gradeFor(score),
     distance: Math.min(game.s, ROUTE_LENGTH),

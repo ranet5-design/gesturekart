@@ -1,9 +1,9 @@
-import { useMemo, useRef } from 'react';
+﻿import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { game, stepFrame } from './state.js';
-import { input } from '../cv/input.js';
-import { LANE_W, ROAD_HALF, ROUTE_LENGTH, NPC_TYPES } from './config.js';
+import { LANE_W, ROAD_HALF, ROUTE_LENGTH, NPC_TYPES, carById } from './config.js';
+import PlayerCar from './PlayerCar.jsx';
 import * as tex from './textures.js';
 
 /* The player's kart always sits at z = 0. The world slides past it:
@@ -17,7 +17,7 @@ const hash = (n) => {
 };
 const zOf = (s) => -(s - game.s);
 
-export default function World({ runId }) {
+export default function World({ runId, car = 'kart' }) {
   return (
     <>
       <color attach="background" args={['#efdcbc']} />
@@ -58,7 +58,7 @@ export default function World({ runId }) {
       </group>
       <Arch atS={ROUTE_LENGTH} lines={['FINISH', 'Dharampura · Civic Score ahead']} bg="#7a1f2b" />
       <Arch atS={-2} lines={['START', 'Thokar Niaz Baig · Canal Road']} bg="#0f5132" />
-      <PlayerCar />
+      <PlayerCar car={car} color={carById(car).color} />
     </>
   );
 }
@@ -91,9 +91,10 @@ function CameraRig() {
       return;
     }
 
-    const tx = game.x * 0.6 + (menu ? Math.sin(t * 0.25) * 3 : 0);
-    const ty = menu ? 4.6 : 3.0 + game.v * 0.025;
-    const tz = menu ? 9.5 : 6.8 + game.v * 0.06;
+    const wide = !menu && game.view === 'wide';
+    const tx = wide ? game.x * 0.35 : game.x * 0.6 + (menu ? Math.sin(t * 0.25) * 3 : 0);
+    const ty = menu ? 4.6 : wide ? 9.5 + game.v * 0.05 : 3.0 + game.v * 0.025;
+    const tz = menu ? 9.5 : wide ? 13 + game.v * 0.08 : 6.8 + game.v * 0.06;
     const k = Math.min(1, dt * 4);
     cam.position.x += (tx - cam.position.x) * k;
     cam.position.y += (ty - cam.position.y) * k;
@@ -102,8 +103,9 @@ function CameraRig() {
       cam.position.x += (Math.random() - 0.5) * game.shake * 0.6;
       cam.position.y += (Math.random() - 0.5) * game.shake * 0.4;
     }
-    cam.lookAt(game.x * 0.8, 1.0, -16);
-    const fov = 58 + game.v * 0.6;
+    if (wide) cam.lookAt(game.x * 0.5, 0, -20);
+    else cam.lookAt(game.x * 0.8, 1.0, -16);
+    const fov = wide ? 62 + game.v * 0.3 : 58 + game.v * 0.6;
     if (Math.abs(cam.fov - fov) > 0.05) {
       cam.fov += (fov - cam.fov) * k;
       cam.updateProjectionMatrix();
@@ -715,146 +717,3 @@ function Pedestrian({ ped }) {
   );
 }
 
-/* ---------------- The player's kart ---------------- */
-
-function PlayerCar() {
-  const ref = useRef();
-  const wheels = useRef([]);
-  const driver = useRef();
-  const steering = useRef();
-  const gloves = useRef();
-  const brake = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#5a0000', emissive: '#ff1a1a', emissiveIntensity: 0.4 }),
-    [],
-  );
-  useFrame((state, dt) => {
-    const g = ref.current;
-    g.position.x = game.x;
-    g.rotation.y = game.yaw;
-    g.rotation.z = -game.roll;
-    g.visible = !(game.invuln > 0 && Math.floor(state.clock.elapsedTime * 12) % 2 === 0);
-    wheels.current.forEach((w) => w && (w.rotation.x -= (game.v * dt) / 0.38));
-    brake.emissiveIntensity = game.braking || game.v < 0.3 ? 2.5 : 0.4;
-    const cockpit = game.view === 'cockpit' && game.phase !== 'menu';
-    driver.current.visible = !cockpit;
-    // The 3D steering wheel copies the player's real hands (clockwise from the driver = turn right)
-    steering.current.rotation.z = -input.wheelAngle;
-    gloves.current.visible = input.wheelHeld && !input.halt;
-  });
-  const wheelPos = [
-    [-0.95, 0.38, -1.25],
-    [0.95, 0.38, -1.25],
-    [-0.98, 0.42, 1.25],
-    [0.98, 0.42, 1.25],
-  ];
-  return (
-    <group ref={ref}>
-      <mesh position={[0, 0.42, 0.1]} castShadow>
-        <boxGeometry args={[1.5, 0.32, 3.4]} />
-        <meshStandardMaterial color="#e63946" roughness={0.35} metalness={0.25} />
-      </mesh>
-      <mesh position={[0, 0.38, -1.95]} castShadow>
-        <boxGeometry args={[1.1, 0.22, 0.9]} />
-        <meshStandardMaterial color="#e63946" roughness={0.35} metalness={0.25} />
-      </mesh>
-      <mesh position={[0, 0.28, -2.4]}>
-        <boxGeometry args={[1.9, 0.08, 0.35]} />
-        <meshStandardMaterial color="#1d1d1d" />
-      </mesh>
-      {[-0.82, 0.82].map((x) => (
-        <mesh key={x} position={[x, 0.45, 0.2]} castShadow>
-          <boxGeometry args={[0.3, 0.3, 1.4]} />
-          <meshStandardMaterial color="#f1faee" />
-        </mesh>
-      ))}
-      {/* driver (hidden in the driver's-seat view, where you ARE the driver) */}
-      <group ref={driver}>
-        <mesh position={[0, 0.85, 0.35]} castShadow>
-          <cylinderGeometry args={[0.28, 0.34, 0.6, 12]} />
-          <meshStandardMaterial color="#1d3557" />
-        </mesh>
-        <mesh position={[0, 1.32, 0.3]} castShadow>
-          <sphereGeometry args={[0.3, 18, 14]} />
-          <meshStandardMaterial color="#f1faee" roughness={0.3} />
-        </mesh>
-        <mesh position={[0, 1.33, 0.05]}>
-          <boxGeometry args={[0.42, 0.14, 0.12]} />
-          <meshStandardMaterial color="#0b0b0b" roughness={0.1} metalness={0.6} />
-        </mesh>
-      </group>
-      {/* dashboard */}
-      <mesh position={[0, 0.74, -0.62]} castShadow>
-        <boxGeometry args={[1.3, 0.2, 0.34]} />
-        <meshStandardMaterial color="#1b1f2a" roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.85, -0.47]} rotation-x={-0.5}>
-        <planeGeometry args={[0.5, 0.12]} />
-        <meshBasicMaterial color="#22c55e" toneMapped={false} />
-      </mesh>
-      {/* steering wheel, tilted toward the driver */}
-      <group position={[0, 1.04, -0.36]} rotation-x={-0.45}>
-        <group ref={steering}>
-          <mesh>
-            <torusGeometry args={[0.22, 0.032, 12, 40]} />
-            <meshStandardMaterial color="#111" roughness={0.5} />
-          </mesh>
-          {[0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((a) => (
-            <mesh key={a} rotation-z={a} position={[Math.sin(a) * 0.11, -Math.cos(a) * 0.11, 0]}>
-              <boxGeometry args={[0.035, 0.22, 0.02]} />
-              <meshStandardMaterial color="#2b2f3a" />
-            </mesh>
-          ))}
-          <mesh>
-            <cylinderGeometry args={[0.06, 0.06, 0.04, 20]} />
-            <meshStandardMaterial color="#e63946" />
-          </mesh>
-          {/* top marker */}
-          <mesh position={[0, 0.22, 0.01]}>
-            <boxGeometry args={[0.04, 0.05, 0.05]} />
-            <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.6} />
-          </mesh>
-          {/* gloved hands at 9 and 3 o'clock */}
-          <group ref={gloves}>
-            {[-0.22, 0.22].map((x) => (
-              <mesh key={x} position={[x, 0, 0.02]}>
-                <sphereGeometry args={[0.055, 14, 10]} />
-                <meshStandardMaterial color="#fbbf24" roughness={0.7} />
-              </mesh>
-            ))}
-          </group>
-        </group>
-      </group>
-      {/* rear wing */}
-      <mesh position={[0, 1.05, 1.75]} castShadow>
-        <boxGeometry args={[1.8, 0.07, 0.45]} />
-        <meshStandardMaterial color="#1d1d1d" />
-      </mesh>
-      {[-0.6, 0.6].map((x) => (
-        <mesh key={x} position={[x, 0.78, 1.75]}>
-          <boxGeometry args={[0.06, 0.5, 0.2]} />
-          <meshStandardMaterial color="#1d1d1d" />
-        </mesh>
-      ))}
-      <mesh position={[-0.5, 0.48, 1.82]} material={brake}>
-        <boxGeometry args={[0.36, 0.14, 0.04]} />
-      </mesh>
-      <mesh position={[0.5, 0.48, 1.82]} material={brake}>
-        <boxGeometry args={[0.36, 0.14, 0.04]} />
-      </mesh>
-      {wheelPos.map((p, i) => (
-        <group key={i} position={p}>
-          <group ref={(el) => (wheels.current[i] = el)}>
-            <mesh rotation-z={Math.PI / 2} castShadow>
-              <cylinderGeometry args={[i < 2 ? 0.34 : 0.4, i < 2 ? 0.34 : 0.4, i < 2 ? 0.3 : 0.42, 16]} />
-              <meshStandardMaterial color="#141414" roughness={0.85} />
-            </mesh>
-            <mesh rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[0.16, 0.16, i < 2 ? 0.32 : 0.44, 8]} />
-              <meshStandardMaterial color="#adb5bd" metalness={0.7} roughness={0.3} />
-            </mesh>
-          </group>
-        </group>
-      ))}
-    </group>
-  );
-}

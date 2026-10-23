@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import World from './game/World.jsx';
-import { game, resetGame, setPhase, onPhase, buildReport, endDrive } from './game/state.js';
+import { game, resetGame, setPhase, onPhase, buildReport, endDrive, nextView, setView as setGameView } from './game/state.js';
+import { recordDrive } from './game/history.js';
+import { CARS } from './game/config.js';
+import History from './ui/History.jsx';
 import { input, initKeyboard, resetInput } from './cv/input.js';
 import { pose, startPose, stopPose } from './cv/pose.js';
 import { initAudio, setMuted, beep, go } from './audio/sound.js';
@@ -14,6 +17,40 @@ import Practice from './ui/Practice.jsx';
 import { LockRing } from './ui/Widgets.jsx';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Remember name, age and car between visits (CNIC is never stored).
+const PROFILE_KEY = 'gesturekart.profile';
+const CAR_KEY = 'gesturekart.car';
+function loadProfile() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}');
+    return { name: typeof p.name === 'string' ? p.name : '', age: Number(p.age) || null };
+  } catch {
+    return { name: '', age: null };
+  }
+}
+function saveProfile(p) {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: p.name, age: p.age }));
+  } catch {
+    /* not remembered */
+  }
+}
+function loadCar() {
+  try {
+    const id = localStorage.getItem(CAR_KEY);
+    return CARS.some((c) => c.id === id) ? id : 'kart';
+  } catch {
+    return 'kart';
+  }
+}
+function saveCar(id) {
+  try {
+    localStorage.setItem(CAR_KEY, id);
+  } catch {
+    /* not remembered */
+  }
+}
 
 /* Flow: menu → (loading webcam) → practice (100% body lock + gesture practice) → countdown → playing → over.
    With the webcam the drive only runs while the body is locked; losing it pauses the game. */
@@ -31,14 +68,25 @@ export default function App() {
   const [pauseReason, setPauseReason] = useState('user');
   const [practised, setPractised] = useState(false);
   const [lockView, setLockView] = useState({ lock: 0, locked: false, issue: '' });
-  const last = useRef({ name: '', mode: 'camera' });
+  const last = useRef({ profile: loadProfile(), mode: 'camera' });
   const busy = useRef(false);
+  const [car, setCarState] = useState(loadCar);
+  const carRef = useRef(car);
+  const chooseCar = useCallback((id) => {
+    carRef.current = id;
+    setCarState(id);
+    saveCar(id);
+  }, []);
 
   useEffect(
     () =>
       onPhase((p) => {
         setPhaseState(p);
-        if (p === 'over') setReport(buildReport());
+        if (p === 'over') {
+          const r = buildReport();
+          const saved = recordDrive(r);
+          setReport({ ...r, historyId: saved.entry.id, rank: saved.rank, saved: saved.saved });
+        }
       }),
     [],
   );
@@ -72,16 +120,20 @@ export default function App() {
     }
   }, []);
 
-  const start = useCallback(async (name, mode) => {
+  const start = useCallback(async (profile, mode) => {
+    const name = profile.name;
     if (busy.current) return;
     busy.current = true;
     try {
-      last.current = { name, mode };
+      last.current = { profile, mode };
+      saveProfile(profile);
       initAudio();
       resetVoice();
       setError('');
       setReport(null);
       resetGame(name, mode);
+      game.car = carRef.current;
+      game.profile = { age: profile.age, cnicMasked: profile.cnicMasked };
       setRunId(game.runId);
       resetInput(mode);
 
@@ -143,10 +195,11 @@ export default function App() {
     }
   }, [countdownThenDrive]);
 
-  const [view, setView] = useState(game.view);
-  const toggleView = useCallback(() => {
-    game.view = game.view === 'cockpit' ? 'chase' : 'cockpit';
-    setView(game.view);
+  const [view, setViewState] = useState(game.view);
+  const toggleView = useCallback(() => setViewState(nextView()), []);
+  const chooseView = useCallback((id) => {
+    setGameView(id);
+    setViewState(game.view);
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -163,7 +216,7 @@ export default function App() {
       const k = e.key.toLowerCase();
       if (k === 'p' || k === 'escape') togglePause();
       if (k === 'm') toggleMute();
-      if (k === 'c') toggleView();
+      if (k === 'c' && ['countdown', 'playing', 'paused', 'practice'].includes(game.phase)) toggleView();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -171,7 +224,7 @@ export default function App() {
 
   const toMenu = () => {
     stopPose();
-    resetGame(last.current.name);
+    resetGame(last.current.profile.name || 'Driver');
     setRunId(game.runId);
     setReport(null);
     setPractised(false);
@@ -190,10 +243,31 @@ export default function App() {
         camera={{ fov: 60, position: [0, 4.5, 9.5], near: 0.1, far: 700 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
       >
-        <World runId={runId} />
+        <World runId={runId} car={car} />
       </Canvas>
 
-      {phase === 'menu' && <StartScreen onStart={start} error={error} defaultName={last.current.name} />}
+      {phase === 'menu' && (
+        <StartScreen
+          onStart={start}
+          error={error}
+          profile={last.current.profile}
+          initialStep={error ? 3 : 0}
+          view={view}
+          onView={chooseView}
+          car={car}
+          onCar={chooseCar}
+          onHistory={(name) => {
+            last.current.profile = { ...last.current.profile, name };
+            setPhase('history');
+          }}
+        />
+      )}
+
+      {phase === 'history' && (
+        <div className="screen over">
+          <History player={last.current.profile.name} onClose={() => setPhase('menu')} />
+        </div>
+      )}
 
       {phase === 'loading' && (
         <div className="screen center dim">
@@ -278,7 +352,7 @@ export default function App() {
       {phase === 'over' && report && (
         <ScoreCard
           report={report}
-          onAgain={() => start(last.current.name, last.current.mode)}
+          onAgain={() => start(last.current.profile, last.current.mode)}
           onMenu={toMenu}
         />
       )}

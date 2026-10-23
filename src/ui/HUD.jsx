@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { game, gradeFor } from '../game/state.js';
+import { game, gradeFor, VIEWS } from '../game/state.js';
 import { input } from '../cv/input.js';
 import { ROUTE_LENGTH, SPEED_LIMIT_KMH, CAR_LEN } from '../game/config.js';
 import { onCaption } from '../audio/voice.js';
@@ -185,8 +185,8 @@ export default function HUD({ onPause, paused, muted, onMute, view, onView }) {
       </section>
 
       <div className="hud-buttons">
-        <button className="ghost" onClick={onView}>
-          {view === 'cockpit' ? '🎥 Behind car' : '🪑 Driver seat'} <kbd>C</kbd>
+        <button className="ghost" onClick={onView} title="Change camera view">
+          🎥 {VIEWS.find((v) => v.id === view)?.name} <kbd>C</kbd>
         </button>
         <button className="ghost" onClick={onMute} aria-label={muted ? 'Unmute' : 'Mute'}>
           {muted ? '🔇' : '🔊'}

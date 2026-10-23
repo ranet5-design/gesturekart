@@ -17,14 +17,17 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 | --- | --- |
 | **Computer vision** | MediaPipe Pose Landmarker (33 body points) runs in the browser on the GPU. Your two hands become an invisible steering wheel: turn it to steer, lift it to speed up, raise your right hand to brake. Works sitting down. |
 | **100% body lock** | The drive never starts until the camera has locked on to your head, shoulders, elbows and hands for 1.5 s straight, with live hints ("Move back a little", "Move to the centre"). If the lock is lost mid-drive, the game pauses itself and resumes when you're back. |
-| **Driver's-seat view** | You sit in the kart: a 3D steering wheel with gloved hands turns exactly as your real hands do. Press `C` for the view from behind the car. |
+| **Step-by-step setup** | Four short steps before you drive: **Driver** (name, age, CNIC; the demo accepts only the test CNIC `123456789` and shows just its last 4 digits), **Car**, **View**, and **Learn** (how to drive + how scoring works). |
+| **5 cars** | GK Kart, City Hatch, Sedan, Rickshaw and Pickup, each with its own 3D model, top speed, pickup, brakes and turning. |
+| **3 camera views** | Driver seat (a 3D steering wheel with gloved hands turns exactly as your real hands do), behind the car, or a high wide angle. Press `C` to switch during a drive. |
+| **History & leaderboard** | Every drive is saved in your browser with its date and time. You see your rank among your own drives and on the leaderboard (each player's best), your best and average score, and your score trend. |
 | **Guided practice** | Before each drive you practise every move (hold, left, right, lift, brake), with instructions in English and Roman Urdu. |
 | **3D world** | React Three Fiber scene of Canal Road: three-lane carriageway, the canal with tree-lined banks, bridges at junctions, rooftop water tanks, billboards with Urdu/English road safety messages. The road scenery is generated without end as you drive. |
 | **Traffic** | Cars, green rickshaws and red buses that keep their distance and obey signals. Pedestrians cross the zebra when the light is red. |
 | **Rules engine** | Red light running, pedestrian hits, collisions, over-speeding (limit 60 km/h), tailgating, lane straddling and unsafe lane changes are penalised. Proper stops at red and clean lane changes earn points back. |
 | **Voice coach** | Real-time spoken cues ("Red light ahead! Raise your right hand to stop.", "Too close! Back off.", "Clean lane change.") with on-screen captions. |
 | **HUD** | Live Civic Score and grade, route progress, next-signal distance and colour, speedometer with limit sign, webcam view with skeleton, gesture meters and an event feed. |
-| **Score card** | Final score out of 100, grade (A+ to F), 12 stats, a speed-over-time graph with violations marked, a drive log and coach's notes. Download it as a **PDF** or **PNG**. |
+| **Score card** | Final score out of 100 and grade (A+ to F), why the drive ended, your rank, stats, a speed graph with every mistake and good habit marked on the line, "where your points went", the full drive log with your running score, and coach's notes. Download it as a **PDF** or **PNG**. |
 | **Accessibility** | Full keyboard fallback, works without a camera, respects reduced-motion settings, sound and voice can be muted. |
 
 ## Controls
@@ -120,7 +123,9 @@ gesturekart/
 │   │   ├── gestures.js       # Pure maths: virtual wheel, lean, brake, body lock
 │   │   └── input.js          # Shared input state + keyboard fallback
 │   ├── game/
-│   │   ├── config.js         # Lanes, speed limit, route length, points table
+│   │   ├── config.js         # Lanes, speed limit, route, points table, the 5 cars
+│   │   ├── history.js        # Saved drives, rankings and leaderboard (localStorage)
+│   │   ├── PlayerCar.jsx     # The 5 car models + shared cockpit and steering wheel
 │   │   ├── state.js          # Physics, traffic AI, signals, pedestrians, rules engine, report
 │   │   ├── World.jsx         # 3D scene (road, canal, scenery, signals, vehicles, kart, camera)
 │   │   └── textures.js       # Procedural canvas textures (no image assets)
@@ -128,7 +133,8 @@ gesturekart/
 │   │   ├── sound.js          # Web Audio engine hum + effects
 │   │   └── voice.js          # Spoken coach with cooldowns and captions
 │   ├── ui/
-│   │   ├── StartScreen.jsx
+│   │   ├── StartScreen.jsx   # 4-step setup: driver, car, view, learn
+│   │   ├── History.jsx       # History & leaderboard
 │   │   ├── HUD.jsx
 │   │   ├── Practice.jsx      # 100% body lock + step-by-step gesture practice
 │   │   ├── Widgets.jsx       # Steering wheel, lock ring, speed gauge

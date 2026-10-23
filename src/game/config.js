@@ -25,6 +25,38 @@ export const POINTS = {
   cleanLane: 4,
 };
 
+/* The five cars a player can pick. Handling numbers:
+   top   top speed (km/h)          accel  m/s² when speeding up
+   brake m/s² when braking         steer  how quickly it moves sideways (1 = normal) */
+export const CARS = [
+  {
+    id: 'kart', name: 'GK Kart', ur: 'Halki aur tez', color: '#e63946',
+    desc: 'Balanced racing kart. A good first choice.',
+    top: 80, accel: 5, brake: 11, steer: 1.0,
+  },
+  {
+    id: 'hatch', name: 'City Hatch', ur: 'Chhoti family gaari', color: '#f1faee',
+    desc: 'Small and easy to stop. Slow to speed up.',
+    top: 70, accel: 3.8, brake: 12, steer: 1.05,
+  },
+  {
+    id: 'sedan', name: 'Sedan', ur: 'Tez aur aaraamdeh', color: '#1d4ed8',
+    desc: 'Fast and smooth. Easy to go over the speed limit!',
+    top: 95, accel: 6.5, brake: 11.5, steer: 0.9,
+  },
+  {
+    id: 'rickshaw', name: 'Rickshaw', ur: 'Lahore ka rickshaw', color: '#16a34a',
+    desc: 'Slow but nimble. Its top speed stays under the limit.',
+    top: 55, accel: 4, brake: 9, steer: 1.25,
+  },
+  {
+    id: 'pickup', name: 'Pickup', ur: 'Bhaari loader', color: '#e9c46a',
+    desc: 'Heavy. Brakes late and turns slowly, so plan ahead.',
+    top: 72, accel: 3.2, brake: 7.5, steer: 0.75,
+  },
+];
+export const carById = (id) => CARS.find((c) => c.id === id) || CARS[0];
+
 export const NPC_TYPES = {
   car: { len: 4.2, w: 1.8 },
   rickshaw: { len: 2.8, w: 1.4 },
