@@ -13,7 +13,8 @@ const NPC_SLOTS = ['car', 'rickshaw', 'car', 'bus', 'rickshaw', 'car', 'rickshaw
 /* All live game data lives in this one mutable object. The 3D scene and HUD read it;
    only this file writes to it. React re-renders are avoided during play for smooth 60 FPS. */
 export const game = {
-  phase: 'menu', // menu | loading | calibrate | countdown | playing | paused | over
+  phase: 'menu', // menu | loading | practice | countdown | playing | paused | over
+  view: 'cockpit', // 'cockpit' (driver's seat) | 'chase' (behind the car)
   runId: 0,
   player: 'Driver',
   mode: 'keyboard',
@@ -448,10 +449,10 @@ export function stepFrame(dt) {
     L.straddleFlag = false;
   }
 
-  // ---- Tracking lost ----
-  if (input.source === 'camera' && !input.poseVisible) {
+  // ---- Hands off the wheel (the car rolls to a stop) ----
+  if (input.source === 'camera' && !input.wheelHeld && !input.halt) {
     T.lost += dt;
-    if (T.lost > 1.2) say("I can't see you. Step back into the frame.", { key: 'lost', cooldown: 8000 });
+    if (T.lost > 1.2) say('Hold the steering wheel with both hands to drive.', { key: 'lost', cooldown: 8000 });
   } else T.lost = 0;
 
   // ---- Telemetry for the score card graph ----

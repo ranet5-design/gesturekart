@@ -3,16 +3,20 @@ import { Canvas } from '@react-three/fiber';
 import World from './game/World.jsx';
 import { game, resetGame, setPhase, onPhase, buildReport, endDrive } from './game/state.js';
 import { input, initKeyboard, resetInput } from './cv/input.js';
-import { pose, startPose, stopPose, beginCalibration, endCalibration } from './cv/pose.js';
+import { pose, startPose, stopPose } from './cv/pose.js';
 import { initAudio, setMuted, beep, go } from './audio/sound.js';
 import { say, resetVoice, setVoiceEnabled } from './audio/voice.js';
 import StartScreen from './ui/StartScreen.jsx';
 import HUD from './ui/HUD.jsx';
 import ScoreCard from './ui/ScoreCard.jsx';
 import CameraPanel from './ui/CameraPanel.jsx';
+import Practice from './ui/Practice.jsx';
+import { LockRing } from './ui/Widgets.jsx';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/* Flow: menu → (loading webcam) → practice (100% body lock + gesture practice) → countdown → playing → over.
+   With the webcam the drive only runs while the body is locked; losing it pauses the game. */
 export default function App() {
   const [phase, setPhaseState] = useState(game.phase);
   const [runId, setRunId] = useState(() => {
@@ -24,9 +28,11 @@ export default function App() {
   const [count, setCount] = useState(0);
   const [report, setReport] = useState(null);
   const [muted, setMutedState] = useState(false);
-  const [calibOk, setCalibOk] = useState(false);
+  const [pauseReason, setPauseReason] = useState('user');
+  const [practised, setPractised] = useState(false);
+  const [lockView, setLockView] = useState({ lock: 0, locked: false, issue: '' });
   const last = useRef({ name: '', mode: 'camera' });
-  const starting = useRef(false);
+  const busy = useRef(false);
 
   useEffect(
     () =>
@@ -38,17 +44,37 @@ export default function App() {
   );
   useEffect(() => initKeyboard(), []);
 
-  // Re-render the calibration screen so "Step into the frame" updates live
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (phase !== 'calibrate') return;
-    const id = setInterval(() => setTick((t) => t + 1), 200);
-    return () => clearInterval(id);
-  }, [phase]);
+  const countdownThenDrive = useCallback(async (resume = false) => {
+    setPhase('countdown');
+    for (const n of [3, 2, 1]) {
+      // Never start (or resume) without a full body lock
+      if (input.source === 'camera' && !input.locked) {
+        say('Body lock lost. Come back into the frame.', { urgent: true });
+        if (resume) {
+          setPauseReason('lock');
+          setPhase('paused');
+        } else setPhase('practice');
+        return;
+      }
+      setCount(n);
+      beep();
+      await wait(800);
+    }
+    go();
+    setPhase('playing');
+    if (!resume) {
+      say(
+        input.source === 'camera'
+          ? 'Go! Turn the wheel to steer, lift it to speed up, raise your right hand to brake.'
+          : 'Go! Arrow keys to steer and change speed. Space bar to brake.',
+        { urgent: true },
+      );
+    }
+  }, []);
 
   const start = useCallback(async (name, mode) => {
-    if (starting.current) return;
-    starting.current = true;
+    if (busy.current) return;
+    busy.current = true;
     try {
       last.current = { name, mode };
       initAudio();
@@ -68,7 +94,7 @@ export default function App() {
             const denied = e?.name === 'NotAllowedError';
             setError(
               denied
-                ? 'Camera permission was blocked. Allow the camera in your browser, or play with the keyboard.'
+                ? 'Camera permission was blocked. Allow the camera in your browser (lock icon in the address bar), or play with the keyboard.'
                 : `Could not start the webcam: ${e?.message || e}. You can play with the keyboard instead.`,
             );
             stopPose();
@@ -77,43 +103,50 @@ export default function App() {
           }
         }
         input.source = 'camera';
-        setPhase('calibrate');
-        setCalibOk(false);
-        say('Face the camera and sit up straight. Calibrating.', { urgent: true });
-        // Wait until we can see the player, then sample their neutral posture for 2 seconds.
-        const t0 = performance.now();
-        while (!input.poseVisible && performance.now() - t0 < 15000) await wait(100);
-        beginCalibration();
-        await wait(2000);
-        endCalibration();
-        setCalibOk(true);
-        await wait(500);
       } else {
         stopPose();
       }
-
-      setPhase('countdown');
-      for (const n of [3, 2, 1]) {
-        setCount(n);
-        beep();
-        await wait(800);
-      }
-      go();
-      setPhase('playing');
-      say(
-        mode === 'camera'
-          ? 'Go! Lean to steer. Spread your hands to speed up. Raise your right hand to stop.'
-          : 'Go! Arrow keys to steer and change speed. Space bar to stop.',
-        { urgent: true },
-      );
+      setPhase('practice');
     } finally {
-      starting.current = false;
+      busy.current = false;
     }
   }, []);
 
+  // Watch the body lock: pause the drive the moment it is lost, resume once it is back at 100%.
+  useEffect(() => {
+    if (input.source !== 'camera' || !['playing', 'paused'].includes(phase)) return;
+    const id = setInterval(() => {
+      setLockView({ lock: input.lock, locked: input.locked, issue: input.lockIssue });
+      if (game.phase === 'playing' && !input.locked) {
+        setPauseReason('lock');
+        setPhase('paused');
+        say('Body lock lost. Game paused. Come back into the frame.', { urgent: true });
+      }
+    }, 100);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'paused' && pauseReason === 'lock' && lockView.locked) {
+      say('Locked again. Resuming.', { urgent: true });
+      countdownThenDrive(true);
+    }
+  }, [phase, pauseReason, lockView.locked, countdownThenDrive]);
+
   const togglePause = useCallback(() => {
-    if (game.phase === 'playing') setPhase('paused');
-    else if (game.phase === 'paused') setPhase('playing');
+    if (game.phase === 'playing') {
+      setPauseReason('user');
+      setPhase('paused');
+    } else if (game.phase === 'paused') {
+      if (input.source === 'camera' && !input.locked) return; // must relock first
+      countdownThenDrive(true);
+    }
+  }, [countdownThenDrive]);
+
+  const [view, setView] = useState(game.view);
+  const toggleView = useCallback(() => {
+    game.view = game.view === 'cockpit' ? 'chase' : 'cockpit';
+    setView(game.view);
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -130,20 +163,23 @@ export default function App() {
       const k = e.key.toLowerCase();
       if (k === 'p' || k === 'escape') togglePause();
       if (k === 'm') toggleMute();
+      if (k === 'c') toggleView();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [togglePause, toggleMute]);
+  }, [togglePause, toggleMute, toggleView]);
 
   const toMenu = () => {
     stopPose();
     resetGame(last.current.name);
     setRunId(game.runId);
     setReport(null);
+    setPractised(false);
     setPhase('menu');
   };
 
   const inGame = ['countdown', 'playing', 'paused'].includes(phase);
+  const camera = input.source === 'camera';
 
   return (
     <div className="app">
@@ -160,25 +196,38 @@ export default function App() {
       {phase === 'menu' && <StartScreen onStart={start} error={error} defaultName={last.current.name} />}
 
       {phase === 'loading' && (
-        <div className="screen center">
+        <div className="screen center dim">
           <div className="panel loading">
             <div className="spinner" />
             <p>{status || 'Starting…'}</p>
+            <small>First time can take 10–20 seconds.</small>
           </div>
         </div>
       )}
 
-      {phase === 'calibrate' && (
-        <div className="screen center">
-          <div className="panel calibrate">
-            <CameraPanel big />
-            <h2>{calibOk ? 'Calibrated ✓' : input.poseVisible ? 'Hold still: calibrating…' : 'Step into the frame'}</h2>
-            <p>Face the camera, sit or stand up straight, and keep your shoulders and hands visible.</p>
-          </div>
-        </div>
+      {phase === 'practice' && (
+        <Practice
+          key={game.runId}
+          mode={last.current.mode}
+          short={practised}
+          onDone={() => {
+            setPractised(true);
+            countdownThenDrive(false);
+          }}
+          onBack={toMenu}
+        />
       )}
 
-      {inGame && <HUD onPause={togglePause} paused={phase === 'paused'} muted={muted} onMute={toggleMute} />}
+      {inGame && (
+        <HUD
+          onPause={togglePause}
+          paused={phase === 'paused'}
+          muted={muted}
+          onMute={toggleMute}
+          view={view}
+          onView={toggleView}
+        />
+      )}
 
       {phase === 'countdown' && (
         <div className="screen center pointer-none">
@@ -188,8 +237,30 @@ export default function App() {
         </div>
       )}
 
-      {phase === 'paused' && (
-        <div className="screen center">
+      {phase === 'paused' && pauseReason === 'lock' && camera && (
+        <div className="screen center dim">
+          <div className="panel relock">
+            <div className="cam-stage">
+              <CameraPanel big />
+              <div className="lock-overlay">
+                <LockRing value={lockView.lock} locked={lockView.locked} size={96} />
+                <div className="lock-text">
+                  <b>{lockView.issue || 'Hold still…'}</b>
+                  <span>Game resumes by itself at 100% body lock</span>
+                </div>
+              </div>
+            </div>
+            <h2>Body lock lost: game paused</h2>
+            <p>Sit back in front of the camera with your head, shoulders and both hands visible.</p>
+            <button className="secondary" onClick={endDrive}>
+              End drive &amp; see score
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === 'paused' && (pauseReason === 'user' || !camera) && (
+        <div className="screen center dim">
           <div className="panel pause">
             <h2>Paused</h2>
             <div className="start-buttons">

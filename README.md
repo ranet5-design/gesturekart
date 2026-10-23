@@ -15,7 +15,10 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 
 | Area | What it does |
 | --- | --- |
-| **Computer vision** | MediaPipe Pose Landmarker (33 body points) runs in the browser on the GPU. Torso lean, hand height and hand distance become steering, braking and throttle. A short calibration learns your neutral posture. |
+| **Computer vision** | MediaPipe Pose Landmarker (33 body points) runs in the browser on the GPU. Your two hands become an invisible steering wheel: turn it to steer, lift it to speed up, raise your right hand to brake. Works sitting down. |
+| **100% body lock** | The drive never starts until the camera has locked on to your head, shoulders, elbows and hands for 1.5 s straight, with live hints ("Move back a little", "Move to the centre"). If the lock is lost mid-drive, the game pauses itself and resumes when you're back. |
+| **Driver's-seat view** | You sit in the kart: a 3D steering wheel with gloved hands turns exactly as your real hands do. Press `C` for the view from behind the car. |
+| **Guided practice** | Before each drive you practise every move (hold, left, right, lift, brake), with instructions in English and Roman Urdu. |
 | **3D world** | React Three Fiber scene of Canal Road: three-lane carriageway, the canal with tree-lined banks, bridges at junctions, rooftop water tanks, billboards with Urdu/English road safety messages. The road scenery is generated without end as you drive. |
 | **Traffic** | Cars, green rickshaws and red buses that keep their distance and obey signals. Pedestrians cross the zebra when the light is red. |
 | **Rules engine** | Red light running, pedestrian hits, collisions, over-speeding (limit 60 km/h), tailgating, lane straddling and unsafe lane changes are penalised. Proper stops at red and clean lane changes earn points back. |
@@ -28,13 +31,15 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 
 | Gesture (webcam) | Keyboard | Action |
 | --- | --- | --- |
-| Lean your torso left / right | `←` `→` or `A` `D` | Steer / change lanes |
-| Raise your **right hand above your head** | `Space` | Halt (brake hard) |
-| Distance between your hands (like gripping a wheel) | `↑` `↓` or `W` `S` | Speed |
+| Hold both hands in front of your chest and **turn the invisible wheel** (leaning into the turn adds a little extra) | `←` `→` or `A` `D` | Steer / change lanes |
+| **Lift the wheel** toward your shoulders (lower it to slow down) | `↑` `↓` or `W` `S` | Speed |
+| Raise your **right hand above your head** | `Space` | Brake |
+| Let go of the wheel | | Car rolls to a stop |
+| | `C` | Driver's seat / behind-the-car view |
 | | `P` / `Esc` | Pause |
 | | `M` | Mute |
 
-Tip: sit or stand about 1.5 m from the webcam with your shoulders and both hands visible, in good light.
+Tip: sit or stand 1–1.5 m from the webcam with your head, shoulders and both hands visible, in good light.
 
 ## Scoring
 
@@ -108,10 +113,11 @@ gesturekart/
 ├── index.html
 ├── src/
 │   ├── main.jsx              # React entry
-│   ├── App.jsx               # Game flow: menu → calibrate → countdown → play → score card
+│   ├── App.jsx               # Game flow: menu → body lock + practice → countdown → play → score card
 │   ├── styles.css            # HUD, menus and score card styling
 │   ├── cv/
-│   │   ├── pose.js           # Webcam + MediaPipe Pose → steer / halt / throttle
+│   │   ├── pose.js           # Webcam + MediaPipe Pose loop, smoothing, calibration
+│   │   ├── gestures.js       # Pure maths: virtual wheel, lean, brake, body lock
 │   │   └── input.js          # Shared input state + keyboard fallback
 │   ├── game/
 │   │   ├── config.js         # Lanes, speed limit, route length, points table
@@ -124,7 +130,9 @@ gesturekart/
 │   ├── ui/
 │   │   ├── StartScreen.jsx
 │   │   ├── HUD.jsx
-│   │   ├── CameraPanel.jsx   # Mirrored webcam view with skeleton overlay
+│   │   ├── Practice.jsx      # 100% body lock + step-by-step gesture practice
+│   │   ├── Widgets.jsx       # Steering wheel, lock ring, speed gauge
+│   │   ├── CameraPanel.jsx   # Mirrored webcam view, skeleton and virtual wheel overlay
 │   │   └── ScoreCard.jsx
 │   └── report/
 │       └── card.js           # Score card canvas → PDF / PNG
@@ -133,9 +141,13 @@ gesturekart/
 
 ## How the gesture detection works
 
-1. **Steering:** the angle of the shoulder line (one shoulder drops when you lean) is blended with how far your shoulders sit to the side of your hips. The result is offset by your calibrated neutral posture, passed through a dead zone so small wobbles don't steer, and smoothed.
-2. **Halt:** your right wrist must be above your nose for 3 frames in a row to brake, and below it for 6 frames to release. This filters out flicker.
-3. **Throttle:** the distance between your wrists, divided by your shoulder width, works at any distance from the camera. Around one shoulder-width apart is slow; about 2.6 shoulder-widths is full speed. If your hands leave the frame, the kart holds a steady cruise speed.
+The maths lives in `src/cv/gestures.js` as plain functions, so it can be tested without a camera.
+
+1. **Body lock:** each frame checks that the nose, both shoulders, both elbows and both wrists are clearly visible inside the frame, with the player centred and at a sensible distance. Good frames fill the lock meter over 1.5 s, and every bad frame knocks it back hard, so shaky tracking never reaches 100%. Once locked, only losing the head and shoulders breaks the lock, so raising a hand to brake is fine.
+2. **Wheel held:** both wrists are visible, about a wheel-width apart and not resting in the lap.
+3. **Steering:** the angle of the line between your wrists, as seen in a mirror. Turning clockwise (left hand up, right hand down) steers right. It is offset by your "hold it straight" calibration, has a small dead zone, and reaches full lock at about 40°. Leaning your torso into the turn adds up to 50% extra, but only past a large dead zone, so sitting normally adds nothing.
+4. **Speed:** the height of the wheel relative to your shoulders, measured in shoulder-widths, so it works at any distance. Chest height is a normal ~45 km/h, and shoulder height is fast. Let go and the car rolls to a stop.
+5. **Brake:** your right wrist is above your nose (or your right elbow is raised high if the hand leaves the top of the frame). It must hold for 3 frames to brake and drop for 6 frames to release, which filters out flicker.
 
 All video processing happens on your device. Nothing is uploaded.
 

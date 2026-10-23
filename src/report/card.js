@@ -26,7 +26,7 @@ export function coachTips(r) {
   if (c.pedestrian) tips.push('Pedestrians on a zebra crossing always have right of way. Stop well before the line.');
   if (c.redLight) tips.push('Raise your right hand early when a signal turns yellow, so you stop before the line.');
   if (c.crash) tips.push('Leave a gap of at least two seconds to the vehicle ahead. Rickshaws and buses stop suddenly.');
-  if (c.overspeed) tips.push(`Canal Road is limited to ${SPEED_LIMIT_KMH} km/h. Keep your hands a little closer together.`);
+  if (c.overspeed) tips.push(`Canal Road is limited to ${SPEED_LIMIT_KMH} km/h. Hold the wheel a little lower to slow down.`);
   if (c.tailgate) tips.push('You followed too closely. Ease off and let the gap grow before overtaking.');
   if (c.straddle || c.unsafeLane) tips.push('Pick a lane and commit. Change lanes in one smooth lean, never near a crossing.');
   if (r.reason !== 'finish') tips.push('Finish the full route to earn a complete score.');

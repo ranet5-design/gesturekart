@@ -1,24 +1,15 @@
 import { FilesetResolver, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { input } from './input.js';
-import { CRUISE_THROTTLE } from '../game/config.js';
+import { readGesture, angleToSteer, liftToThrottle, bodyCheck, stepLock, combineSteer } from './gestures.js';
 
 const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 
-// MediaPipe Pose landmark indexes
-const NOSE = 0;
-const L_SHOULDER = 11; // the person's own left
-const R_SHOULDER = 12;
-const L_WRIST = 15;
-const R_WRIST = 16;
-const L_HIP = 23;
-const R_HIP = 24;
-
 export const pose = {
   video: null,
   ready: false,
-  calib: { lean: 0 },
+  calib: { angle: 0, lean: 0 },
 };
 
 let landmarker = null;
@@ -27,12 +18,12 @@ let rafId = 0;
 let lastVideoTime = -1;
 let haltOn = 0;
 let haltOff = 0;
+let heldOn = 0;
+let heldOff = 0;
 let fpsFrames = 0;
 let fpsT = 0;
 let calibSamples = null;
-
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const vis = (p) => (p ? p.visibility ?? 1 : 0);
+let lastDetectT = 0;
 
 export async function startPose(onStatus = () => {}) {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -50,7 +41,7 @@ export async function startPose(onStatus = () => {}) {
   await video.play();
   pose.video = video;
 
-  onStatus('Loading the MediaPipe Pose model…');
+  onStatus('Loading the body-tracking model…');
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
   const opts = (delegate) => ({
     baseOptions: { modelAssetPath: MODEL_URL, delegate },
@@ -80,16 +71,25 @@ export function stopPose() {
   pose.ready = false;
   input.landmarks = null;
   input.poseVisible = false;
+  input.wheelHeld = false;
+  input.lock = 0;
+  input.locked = false;
+  lastDetectT = 0;
 }
 
-// Collect the neutral lean for a moment so a slightly tilted webcam doesn't steer the car.
+// Learn what "wheel straight" looks like for this player (a tilted webcam shouldn't steer the car).
 export function beginCalibration() {
   calibSamples = [];
 }
 export function endCalibration() {
   if (calibSamples && calibSamples.length > 5) {
-    const sorted = [...calibSamples].sort((a, b) => a - b);
-    pose.calib.lean = sorted[Math.floor(sorted.length / 2)];
+    const median = (key) => {
+      const sorted = calibSamples.map((s) => s[key]).sort((a, b) => a - b);
+      return sorted[Math.floor(sorted.length / 2)];
+    };
+    // Only trust a small correction; a big one means they weren't sitting or holding it straight
+    pose.calib.angle = Math.max(-0.25, Math.min(0.25, median('angle')));
+    pose.calib.lean = Math.max(-0.6, Math.min(0.6, median('lean')));
   }
   calibSamples = null;
 }
@@ -105,7 +105,15 @@ function loop() {
   const result = landmarker.detectForVideo(video, now);
   const lm = result.landmarks?.[0] || null;
   input.landmarks = lm;
-  process(lm, video.videoWidth / video.videoHeight || 4 / 3);
+  const dt = lastDetectT ? Math.min(0.2, (now - lastDetectT) / 1000) : 0;
+  lastDetectT = now;
+  const check = bodyCheck(lm);
+  const next = stepLock({ lock: input.lock, locked: input.locked }, check, dt);
+  input.lock = next.lock;
+  input.locked = next.locked;
+  input.lockIssue = check.issue;
+  input.lockParts = check.parts;
+  apply(readGesture(lm, video.videoWidth / video.videoHeight || 4 / 3));
 
   fpsFrames++;
   if (now - fpsT > 1000) {
@@ -115,53 +123,11 @@ function loop() {
   }
 }
 
-function process(lm, aspect) {
-  if (!lm) {
-    input.poseVisible = false;
-    input.handsVisible = false;
-    // Ease off steering and hold cruise speed while the player is out of frame.
-    input.steer *= 0.8;
-    input.throttle += (CRUISE_THROTTLE - input.throttle) * 0.1;
-    return;
-  }
-  const ls = lm[L_SHOULDER];
-  const rs = lm[R_SHOULDER];
-  const shouldersOk = vis(ls) > 0.5 && vis(rs) > 0.5;
-  input.poseVisible = shouldersOk;
-  if (!shouldersOk) return;
+function apply(g) {
+  input.poseVisible = g.visible;
 
-  // x is scaled by aspect so distances are in the same units as y.
-  const dx = (ls.x - rs.x) * aspect;
-  const dy = ls.y - rs.y;
-  const shoulderW = Math.hypot(dx, dy) || 0.2;
-
-  // ---- Steering: lateral torso lean ----
-  // Raw camera frame is not mirrored: the person's left side is on the image's right (larger x).
-  // Leaning to your left moves the shoulders toward larger x and drops the left shoulder.
-  const tilt = Math.atan2(dy, dx); // + when left shoulder is lower
-  let lean = tilt / 0.35;
-  const lh = lm[L_HIP];
-  const rh = lm[R_HIP];
-  if (vis(lh) > 0.5 && vis(rh) > 0.5) {
-    const midSx = (ls.x + rs.x) / 2;
-    const midHx = (lh.x + rh.x) / 2;
-    const torsoLen = Math.abs((ls.y + rs.y) / 2 - (lh.y + rh.y) / 2) || 0.3;
-    const offset = ((midSx - midHx) * aspect) / torsoLen / 0.25;
-    lean = 0.5 * lean + 0.5 * offset;
-  }
-  if (calibSamples) calibSamples.push(lean);
-  input.rawLean = lean;
-  let steer = -(lean - pose.calib.lean); // lean left -> negative steer (left)
-  const DEAD = 0.18;
-  steer = Math.abs(steer) < DEAD ? 0 : (steer - Math.sign(steer) * DEAD) / (1 - DEAD);
-  steer = clamp(steer, -1, 1);
-  input.steer += (steer - input.steer) * 0.35;
-
-  // ---- Halt: right hand above head ----
-  const nose = lm[NOSE];
-  const rw = lm[R_WRIST];
-  const raw = vis(rw) > 0.5 && vis(nose) > 0.5 && rw.y < nose.y - shoulderW * 0.15;
-  if (raw) {
+  // Debounce so a single bad frame never brakes or lets go of the wheel
+  if (g.haltRaw) {
     haltOn++;
     haltOff = 0;
   } else {
@@ -171,22 +137,34 @@ function process(lm, aspect) {
   if (haltOn >= 3) input.halt = true;
   if (haltOff >= 6) input.halt = false;
 
-  // ---- Speed: distance between the hands, like gripping a wide or narrow steering wheel ----
-  const lw = lm[L_WRIST];
-  const handsOk = vis(lw) > 0.5 && vis(rw) > 0.5 && !input.halt;
-  input.handsVisible = handsOk;
-  if (handsOk) {
-    const span = Math.hypot((lw.x - rw.x) * aspect, lw.y - rw.y) / shoulderW;
-    input.handSpan = span;
-    const t = clamp((span - 0.8) / (2.6 - 0.8), 0, 1);
-    input.throttle += (t - input.throttle) * 0.2;
-  } else if (!input.halt) {
-    input.throttle += (CRUISE_THROTTLE - input.throttle) * 0.05;
+  if (g.held) {
+    heldOn++;
+    heldOff = 0;
+  } else {
+    heldOff++;
+    heldOn = 0;
+  }
+  if (heldOn >= 3) input.wheelHeld = true;
+  if (heldOff >= 8) input.wheelHeld = false;
+
+  if (g.held) {
+    if (calibSamples) calibSamples.push({ angle: g.angle, lean: g.lean });
+    const angle = g.angle - pose.calib.angle;
+    input.wheelAngle += (angle - input.wheelAngle) * 0.4;
+    const target = combineSteer(angleToSteer(input.wheelAngle), g.lean - pose.calib.lean);
+    input.steer += (target - input.steer) * 0.4;
+    input.wheelLift += (g.lift - input.wheelLift) * 0.25;
+    input.throttle += (liftToThrottle(input.wheelLift) - input.throttle) * 0.2;
+  } else if (!input.wheelHeld) {
+    // Hands off the wheel: straighten up and roll to a gentle stop
+    input.wheelAngle *= 0.85;
+    input.steer *= 0.8;
+    input.throttle += (0 - input.throttle) * 0.08;
   }
 }
 
 // Skeleton connections for drawing
 export const BONES = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
-  [11, 23], [12, 24], [23, 24], [23, 25], [24, 26], [0, 11], [0, 12],
+  [11, 23], [12, 24], [23, 24], [0, 11], [0, 12],
 ];

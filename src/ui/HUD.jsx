@@ -4,6 +4,7 @@ import { input } from '../cv/input.js';
 import { ROUTE_LENGTH, SPEED_LIMIT_KMH, CAR_LEN } from '../game/config.js';
 import { onCaption } from '../audio/voice.js';
 import CameraPanel from './CameraPanel.jsx';
+import { Wheel, SpeedGauge } from './Widgets.jsx';
 
 function snapshot() {
   const front = game.s + CAR_LEN / 2;
@@ -12,20 +13,20 @@ function snapshot() {
     kmh: Math.round(game.v * 3.6),
     score: Math.round(game.score),
     dist: game.s,
-    t: game.t,
-    steer: input.steer,
-    throttle: input.throttle,
+    angle: input.wheelAngle,
+    held: input.wheelHeld,
+    lift: input.wheelLift,
     halt: input.halt,
-    poseVisible: input.poseVisible,
+    lock: input.lock,
     cvFps: input.cvFps,
     source: input.source,
     signal: next ? { state: next.state, d: Math.max(0, Math.round(next.s - front)) } : null,
-    events: game.events.slice(-5),
+    events: game.events.slice(-4),
     eventCount: game.events.length,
   };
 }
 
-export default function HUD({ onPause, paused, muted, onMute }) {
+export default function HUD({ onPause, paused, muted, onMute, view, onView }) {
   const [s, setS] = useState(snapshot);
   const [caption, setCaption] = useState('');
   const [flash, setFlash] = useState(null);
@@ -33,7 +34,7 @@ export default function HUD({ onPause, paused, muted, onMute }) {
   const capTimer = useRef();
 
   useEffect(() => {
-    const id = setInterval(() => setS(snapshot()), 80);
+    const id = setInterval(() => setS(snapshot()), 60);
     return () => clearInterval(id);
   }, []);
 
@@ -56,32 +57,32 @@ export default function HUD({ onPause, paused, muted, onMute }) {
   }, [s.eventCount]);
 
   const g = gradeFor(s.score);
-  const over = s.kmh > SPEED_LIMIT_KMH;
   const progress = Math.min(1, s.dist / ROUTE_LENGTH);
-  const scoreTone = s.score >= 85 ? 'good' : s.score >= 55 ? 'warn' : 'bad';
+  const tone = s.score >= 85 ? 'good' : s.score >= 55 ? 'warn' : 'bad';
+  const camera = s.source === 'camera';
+  const status = s.halt
+    ? { cls: 'halt', icon: '✋', text: 'BRAKING' }
+    : !s.held
+      ? { cls: 'off', icon: '🙌', text: 'HOLD THE WHEEL' }
+      : { cls: 'drive', icon: '●', text: 'DRIVING' };
 
   return (
     <div className="hud">
       {flash && <div key={flash.key} className={`flash ${flash.bad ? 'bad' : 'good'}`} />}
 
       <section className="hud-score panel">
-        <div className={`score-num ${scoreTone}`}>{s.score}</div>
+        <div className={`score-ring ${tone}`} style={{ '--p': s.score }}>
+          <span>{s.score}</span>
+        </div>
         <div className="score-meta">
           <span className="eyebrow">Civic Score</span>
-          <span className="grade">
+          <b>
             {g.grade} · {g.label}
-          </span>
-        </div>
-        <div className="route">
-          <div className="route-bar">
+          </b>
+          <div className="route-bar" aria-label={`${Math.round(progress * 100)}% of the route`}>
             <div className="route-fill" style={{ width: `${progress * 100}%` }} />
-            <div className="route-kart" style={{ left: `${progress * 100}%` }} />
           </div>
-          <div className="route-labels">
-            <span>Thokar</span>
-            <span>{((ROUTE_LENGTH - s.dist) / 1000).toFixed(2)} km left</span>
-            <span>Dharampura</span>
-          </div>
+          <span className="route-text">{((ROUTE_LENGTH - s.dist) / 1000).toFixed(2)} km to Dharampura</span>
         </div>
       </section>
 
@@ -93,33 +94,28 @@ export default function HUD({ onPause, paused, muted, onMute }) {
             <i className={s.signal.state === 'green' ? 'on g' : ''} />
           </div>
           <div>
-            <div className="eyebrow">Signal ahead</div>
             <div className="sig-d">{s.signal.d} m</div>
-            {s.signal.state !== 'green' && <div className="sig-hint">✋ Raise right hand to stop</div>}
+            <div className="sig-hint">
+              {s.signal.state === 'green'
+                ? 'Green: keep going'
+                : camera
+                  ? '✋ Right hand up to stop'
+                  : 'Press Space to stop'}
+            </div>
           </div>
         </section>
       )}
 
       <aside className="hud-right">
-        {s.source === 'camera' ? (
+        {camera && (
           <div className="panel cam-wrap">
             <CameraPanel />
-            {!s.poseVisible && <div className="cam-lost">Step into the frame</div>}
-            <div className="cam-fps">{s.cvFps} fps</div>
-          </div>
-        ) : (
-          <div className="panel keys">
-            <div className="eyebrow">Keyboard</div>
-            <div><kbd>←</kbd><kbd>→</kbd> steer</div>
-            <div><kbd>↑</kbd><kbd>↓</kbd> speed</div>
-            <div><kbd>Space</kbd> stop</div>
+            <div className="cam-badges">
+              <span className={s.lock >= 1 ? 'b good' : 'b warn'}>🔒 {Math.round(s.lock * 100)}%</span>
+              <span className="b">{s.cvFps} fps</span>
+            </div>
           </div>
         )}
-        <div className="panel meters">
-          <Meter label="Steer" value={s.steer} centered />
-          <Meter label="Throttle" value={s.throttle} />
-          <div className={`halt ${s.halt ? 'on' : ''}`}>{s.halt ? '✋ HALT' : 'Halt: right hand up'}</div>
-        </div>
         <ul className="feed">
           {s.events
             .slice()
@@ -136,46 +132,68 @@ export default function HUD({ onPause, paused, muted, onMute }) {
         </ul>
       </aside>
 
-      <section className={`hud-speed panel ${over ? 'over' : ''}`}>
-        <div className="speed-num">{s.kmh}</div>
-        <div className="speed-unit">km/h</div>
-        <div className="limit" title="Speed limit">
-          {SPEED_LIMIT_KMH}
-        </div>
-      </section>
-
       {caption && (
         <div className="caption" role="status">
           <span className="coach-dot" /> {caption}
         </div>
       )}
 
+      <section className={`dash panel ${view === 'cockpit' ? 'no-wheel' : ''}`}>
+        <div className="dash-gauge">
+          <SpeedGauge kmh={s.kmh} limit={SPEED_LIMIT_KMH} />
+        </div>
+        {view !== 'cockpit' && (
+          <div className="dash-wheel">
+            <Wheel angle={s.angle} held={s.held} halt={s.halt} size={132} />
+          </div>
+        )}
+        <div className="dash-status">
+          <div className={`status ${status.cls}`}>
+            <span>{status.icon}</span> {status.text}
+          </div>
+          <div className="gas">
+            <span>{camera ? 'Wheel height' : 'Gas'}</span>
+            <div className="gas-bar">
+              <i style={{ height: `${Math.round(s.lift * 100)}%` }} />
+            </div>
+            <small>{s.lift > 0.72 ? 'Fast' : s.lift < 0.3 ? 'Slow' : 'Normal'}</small>
+          </div>
+          <div className="dash-help">
+            {camera ? (
+              <>
+                <span>Turn wheel = steer</span>
+                <span>Lift wheel = faster</span>
+                <span>Right hand up = brake</span>
+              </>
+            ) : (
+              <>
+                <span>
+                  <kbd>←</kbd>
+                  <kbd>→</kbd> steer
+                </span>
+                <span>
+                  <kbd>↑</kbd>
+                  <kbd>↓</kbd> speed
+                </span>
+                <span>
+                  <kbd>Space</kbd> brake
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
       <div className="hud-buttons">
-        <button className="ghost" onClick={onMute} aria-label="Toggle sound">
+        <button className="ghost" onClick={onView}>
+          {view === 'cockpit' ? '🎥 Behind car' : '🪑 Driver seat'} <kbd>C</kbd>
+        </button>
+        <button className="ghost" onClick={onMute} aria-label={muted ? 'Unmute' : 'Mute'}>
           {muted ? '🔇' : '🔊'}
         </button>
         <button className="ghost" onClick={onPause}>
           {paused ? 'Resume' : 'Pause'} <kbd>P</kbd>
         </button>
-      </div>
-    </div>
-  );
-}
-
-function Meter({ label, value, centered }) {
-  const pct = centered ? 50 + value * 50 : value * 100;
-  return (
-    <div className="meter">
-      <span>{label}</span>
-      <div className={`bar ${centered ? 'centered' : ''}`}>
-        {centered ? (
-          <div
-            className="fill"
-            style={{ left: `${Math.min(50, pct)}%`, width: `${Math.abs(pct - 50)}%` }}
-          />
-        ) : (
-          <div className="fill" style={{ width: `${pct}%` }} />
-        )}
       </div>
     </div>
   );
