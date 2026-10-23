@@ -6,6 +6,7 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 > Built for the GestureKart Hackathon. Traditional traffic safety campaigns in Pakistan struggle to engage young drivers. GestureKart turns the rules into something you physically practise.
 
 🌐 **Live demo:** `https://<your-project>.vercel.app`
+💻 **Code:** https://github.com/ranet5-design/gesturekart
 🎥 **Demo video:** `<Loom / YouTube link>`
 
 ---
@@ -76,7 +77,7 @@ The route is 1.8 km, from Thokar Niaz Baig to Dharampura. If your score hits 0, 
 Requirements: Node.js 18+ and a webcam. Chrome or Edge is recommended.
 
 ```bash
-git clone https://github.com/<your-username>/gesturekart.git
+git clone https://github.com/ranet5-design/gesturekart.git
 cd gesturekart
 npm install
 npm run dev
@@ -160,7 +161,7 @@ All video processing happens on your device. Nothing is uploaded.
 ```
 📌 Project Name: GestureKart
 🌐 Live App Link: https://<your-project>.vercel.app
-💻 GitHub Repo: https://github.com/<your-username>/gesturekart
+💻 GitHub Repo: https://github.com/ranet5-design/gesturekart
 🎥 Demo Video: <Loom / YouTube link>
 👥 Team Members: <Member 1>, <Member 2>, <Member 3>, <Member 4>
 ```
