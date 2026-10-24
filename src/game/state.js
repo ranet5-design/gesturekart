@@ -759,7 +759,12 @@ export function stepFrame(dt) {
   // ---- Hands off the wheel ----
   if (input.source === 'camera' && !input.wheelHeld && !input.halt) {
     T.lost += dt;
-    if (T.lost > 1.2 && !input.resting) say('Hold the steering wheel with both hands to drive.', { key: 'lost', cooldown: 8000 });
+    if (T.lost > 1.2 && !input.resting && settings.speedMode !== 'auto') {
+      say(
+        settings.steerMode === 'lean' ? 'Keep both hands up in front of you to control the speed.' : 'Hold the steering wheel with both hands to drive.',
+        { key: 'lost', cooldown: 8000 },
+      );
+    }
   } else T.lost = 0;
 
   // ---- Telemetry ----

@@ -51,7 +51,8 @@ export function drive(mods, level, style = 'good') {
     const front = game.s + CAR_LEN / 2;
     const sig = game.signals.find((g) => g.s > front - 0.5);
     const d = sig ? sig.s - front : 999;
-    const zoneLimit = mods.state.limitAt(game.s + 40).limit;
+    // Respect the limit where you are AND the one coming up
+    const zoneLimit = Math.min(mods.state.limitAt(game.s).limit, mods.state.limitAt(game.s + 40).limit);
     if (style === 'good') {
       input.throttle = Math.min(0.68, (zoneLimit - 8) / 80);
       input.halt = !!sig && sig.state !== 'green' && d < 30 && d > -0.5;

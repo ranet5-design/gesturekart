@@ -72,6 +72,51 @@ describe('braking with the right hand', () => {
   });
 });
 
+describe('brief controls (default): lean to steer, hand distance = speed', () => {
+  const brief = { steerMode: 'lean', speedMode: 'distance' };
+  const lc = { ...calib, bodyLean: 0 };
+  const run = (frames, input = freshInput(), S = createControls()) => {
+    frames.forEach((lm, i) => applyGesture(S, input, readGesture(lm, A), null, lc, brief, i * 33));
+    return input;
+  };
+  const leanBody = (dir, { hands = 1 } = {}) => {
+    // Leaning to the player's right: right shoulder drops and the head moves over to the right
+    // (raw camera frame: the player's right side is at smaller x)
+    const lm = body({ visHands: hands });
+    lm[12] = { ...lm[12], y: 0.45 + 0.07 * dir };
+    lm[11] = { ...lm[11], y: 0.45 - 0.07 * dir };
+    lm[0] = { ...lm[0], x: 0.5 - 0.07 * dir };
+    return lm;
+  };
+
+  it('sitting straight drives straight', () => {
+    expect(Math.abs(run(Array(40).fill(body())).steer)).toBeLessThan(0.02);
+  });
+  it('leaning right steers right, leaning left steers left', () => {
+    expect(run(Array(40).fill(leanBody(1))).steer).toBeGreaterThan(0.6);
+    expect(run(Array(40).fill(leanBody(-1))).steer).toBeLessThan(-0.6);
+  });
+  it('leaning still steers when the hands are out of view', () => {
+    expect(run(Array(40).fill(leanBody(1, { hands: 0.1 }))).steer).toBeGreaterThan(0.6);
+  });
+  it('hands wide apart = faster, close together = slower', () => {
+    const wide = run(Array(60).fill(body({ lw: [0.82, 0.62], rw: [0.18, 0.62] })));
+    const close = run(Array(60).fill(body({ lw: [0.54, 0.62], rw: [0.46, 0.62] })));
+    expect(wide.throttle).toBeGreaterThan(0.75);
+    expect(close.throttle).toBeLessThan(0.3);
+  });
+  it('raising the right hand to stop does not steer, even though it tilts the shoulders', () => {
+    const S = createControls();
+    const input = freshInput();
+    let maxSteer = 0;
+    brakeSequence().forEach((lm, i) => {
+      applyGesture(S, input, readGesture(lm, A), null, lc, brief, i * 33);
+      if (i > 30) maxSteer = Math.max(maxSteer, Math.abs(input.steer));
+    });
+    expect(maxSteer).toBeLessThan(0.05);
+  });
+});
+
 describe('landmark smoothing (One Euro filter)', () => {
   it('removes most of the jitter from a hand that is holding still', () => {
     const f = createLandmarkFilter();

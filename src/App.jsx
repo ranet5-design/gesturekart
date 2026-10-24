@@ -164,7 +164,9 @@ export default function App() {
         lvl.id
           ? `Level ${lvl.id}. ${lvl.name}. ${lvl.goal}`
           : input.source === 'camera'
-            ? 'Go! Turn the wheel to steer, raise your right hand to brake.'
+            ? settings.steerMode === 'lean'
+              ? 'Go! Lean to steer, spread your hands to go faster, raise your right hand to stop.'
+              : 'Go! Turn the wheel to steer, raise your right hand to brake.'
             : 'Go! Arrow keys to steer and change speed. Space bar to brake.',
         { urgent: true },
       );

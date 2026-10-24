@@ -16,6 +16,8 @@ const T = {
   'Stop weaving between lanes.': ['بار بار لین نہ بدلیں۔', 'बार बार लेन न बदलें।', 'Baar baar lane na badlein.'],
   'Use your indicator before changing lanes.': ['لین بدلنے سے پہلے انڈیکیٹر دیں۔', 'लेन बदलने से पहले इंडिकेटर दें।', 'Lane badalne se pehle indicator dein.'],
   'Hold the steering wheel with both hands to drive.': ['چلانے کے لیے دونوں ہاتھوں سے اسٹیئرنگ پکڑیں۔', 'चलाने के लिए दोनों हाथों से स्टीयरिंग पकड़ें।', 'Chalane ke liye dono haathon se steering pakrein.'],
+  'Keep both hands up in front of you to control the speed.': ['رفتار کے لیے دونوں ہاتھ سامنے اوپر رکھیں۔', 'रफ़्तार के लिए दोनों हाथ सामने ऊपर रखें।', 'Raftaar ke liye dono haath saamne upar rakhein.'],
+  'Go! Lean to steer, spread your hands to go faster, raise your right hand to stop.': ['چلیں! جھک کر اسٹیئرنگ کریں، ہاتھ دور کریں تو تیز، دایاں ہاتھ اوپر تو رکیں۔', 'चलें! झुक कर स्टीयरिंग करें, हाथ दूर करें तो तेज़, दायां हाथ ऊपर तो रुकें।', 'Chalein! Jhuk kar steering karein, haath door karein to tez, daayan haath upar to rukein.'],
   'Halfway there. Keep it civic.': ['آدھا راستہ طے ہو گیا۔ اسی طرح چلتے رہیں۔', 'आधा रास्ता तय हो गया। इसी तरह चलते रहें।', 'Aadha raasta tay ho gaya. Isi tarah chalte rahein.'],
   'Brake! Car stopped ahead.': ['بریک! آگے گاڑی رکی ہوئی ہے۔', 'ब्रेक! आगे गाड़ी रुकी हुई है।', 'Brake! Aage gaari ruki hui hai.'],
   'Ambulance behind you! Move to another lane and let it pass.': ['پیچھے ایمبولینس ہے! دوسری لین میں جائیں اور راستہ دیں۔', 'पीछे एम्बुलेंस है! दूसरी लेन में जाएं और रास्ता दें।', 'Peeche ambulance hai! Doosri lane mein jaayein aur raasta dein.'],

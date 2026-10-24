@@ -1,4 +1,4 @@
-# GestureKart 🚦
+﻿# GestureKart 🚦
 
 **A physical gesture-controlled traffic rule training simulator.**
 Drive a kart down Lahore's Canal Road using only your body, tracked live through your webcam. Lean to steer, raise your right hand to stop at red lights, and spread your hands to speed up. Every traffic violation is logged, a spoken coach talks you through the drive, and at the end you download your **Civic Driving Score Card** as a PDF or image.
@@ -7,15 +7,25 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 
 🌐 **Live demo:** https://gesturekart.vercel.app
 💻 **Code:** https://github.com/ranet5-design/gesturekart
-🎥 **Demo video:** `<Loom / YouTube link>`
+🎥 **Demo video:** attached to the Google Classroom submission
 
 ---
+
+## The brief's controls are the default
+
+| Brief requirement | Default control in GestureKart |
+| --- | --- |
+| Steer left / right: lean torso laterally | **Lean your upper body left or right** (shoulder tilt + head position, calibrated to how you sit) |
+| Halt / stop: raise right hand above head at red signals | **Right hand above your head** brakes; the car drives straight while braking |
+| Speed control: distance between hands acts as virtual steering wheel | **Hands wide apart = faster, close together = slower** |
+
+Everything else (a virtual steering wheel, Auto speed, wheel-height or lean-forward speed, one-hand mode) is an optional extra in **Settings**.
 
 ## Features
 
 | Area | What it does |
 | --- | --- |
-| **Computer vision** | MediaPipe Pose Landmarker (33 body points) runs in the browser on the GPU. Your two hands become an invisible steering wheel: turn it to steer, lift it to speed up, raise your right hand to brake. Works sitting down. |
+| **Computer vision** | MediaPipe Pose Landmarker (33 body points) runs in the browser on the GPU, smoothed with a One Euro filter. Lean to steer, hand distance for speed, right hand up to stop. Works sitting down. |
 | **100% body lock** | The drive never starts until the camera has locked on to your head, shoulders, elbows and hands for 1.5 s straight, with live hints ("Move back a little", "Move to the centre"). If the lock is lost mid-drive, the game pauses itself and resumes when you're back. |
 | **Focus & drowsiness check** | MediaPipe Face Landmarker watches for eyes closed over 1.3 s, heavy blinking over the last minute (PERCLOS), yawning, looking down at a phone, or turning away. 1st warning: a FOCUS banner, a voice alert and the car eases off. 2nd: soft white pulses. 3rd within 2 minutes: the car stops and the game stays paused until a Focus meter reaches 100% (3 s of steady, eyes-open attention). Pulses stay under 3 flashes per second (photosensitivity guideline), and can be turned off. |
 | **8 licence levels** | Learner Permit → Signals & Zebra → City Traffic → Speed Zones → Indicators → Night & Rain → Rush Hour → Final Driving Test (examiner mode). Each level has clear pass rules and 1–3 stars, and a map shows what is cleared, what is left, and your licence progress. Clear all 8 to earn the GestureKart licence. |
@@ -24,7 +34,7 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 | **Pakistan-specific road** | Ambulance (Rescue 1122) that you must give way to, wrong-way bikers, donkey carts, school and hospital speed zones, Urdu/Roman Urdu signboards, and an **Urdu voice coach** (Urdu voice in Edge, Hindi voice or Roman Urdu captions elsewhere). |
 | **Real driving habits** | Seatbelt gesture before every drive, arm-out indicator before lane changes, night headlights, rain that lengthens braking, and fog. |
 | **Step-by-step setup** | Short steps before you drive: **Driver** (name, age, CNIC; the demo accepts only the test CNIC `123456789` and shows just its last 4 digits), **Level**, **Car**, **View**, and **Learn** (how to drive + how scoring works). |
-| **Settings** | Speed mode (Auto / wheel height / hand distance as in the brief / lean forward-back), arm rest cruise, one-hand mode, colour-blind STOP/WAIT/GO signals, flash off, replays, music, focus check. |
+| **Settings** | Steering (torso lean, the default from the brief, or a virtual steering wheel), speed (hand distance, the default from the brief, or Auto / wheel height / lean forward-back), arm rest cruise, one-hand mode, colour-blind STOP/WAIT/GO signals, flash off, privacy mode, replays, music, focus check. |
 | **5 cars** | GK Kart, City Hatch, Sedan, Rickshaw and Pickup, each with its own 3D model, top speed, pickup, brakes and turning. |
 | **3 camera views** | Driver seat (a 3D steering wheel with gloved hands turns exactly as your real hands do), behind the car, or a high wide angle. Press `C` to switch during a drive. |
 | **History & leaderboard** | Every drive is saved in your browser with its date and time. You see your rank among your own drives and on the leaderboard (each player's best), your best and average score, and your score trend. |
@@ -41,8 +51,8 @@ Drive a kart down Lahore's Canal Road using only your body, tracked live through
 
 | Gesture (webcam) | Keyboard | Action |
 | --- | --- | --- |
-| Hold both hands in front of your chest and **turn the invisible wheel**. If your hands are out of view, **lean your torso** to steer (as in the brief). | `←` `→` or `A` `D` | Steer / change lanes |
-| **Auto speed** (default): the car keeps a safe speed; **lower the wheel** to slow down. Other modes in Settings: wheel height, hand distance, lean forward/back. | `↑` `↓` or `W` `S` | Speed |
+| **Lean your torso** left or right (default, as in the brief). Optional in Settings: turn a virtual steering wheel. | `←` `→` or `A` `D` | Steer / change lanes |
+| **Hands wide apart = faster, close together = slower** (default, as in the brief). Optional: Auto speed, wheel height, lean forward/back. | `↑` `↓` or `W` `S` | Speed |
 | Raise your **right hand above your head** | `Space` | Brake |
 | Stretch your **left or right arm straight out** to the side | `Q` / `E` | Indicator |
 | Right hand to the left shoulder, then pull down to the right hip | `B` | Seatbelt |
@@ -100,7 +110,7 @@ The API validates every submission (score range, realistic speed, clean names) a
 npm test
 ```
 
-55 automated tests (vitest) cover the online leaderboard API (with an in-memory Redis), the steering-wheel, brake, indicator, seatbelt and lean gestures, the 100% body lock, the focus/drowsiness detector, every licence level (a scripted careful driver must pass each one, a reckless one must fail), replays, history, XP, streaks and rankings.
+67 automated tests (vitest) cover the online leaderboard API (with an in-memory Redis), the steering-wheel, brake, indicator, seatbelt and lean gestures, the 100% body lock, the focus/drowsiness detector, every licence level (a scripted careful driver must pass each one, a reckless one must fail), replays, history, XP, streaks and rankings.
 
 | Grade | Score |
 | --- | --- |
@@ -199,8 +209,9 @@ The maths lives in `src/cv/gestures.js` as plain functions, so it can be tested 
 
 1. **Body lock:** each frame checks that the nose, both shoulders, both elbows and both wrists are clearly visible inside the frame, with the player centred and at a sensible distance. Good frames fill the lock meter over 1.5 s, and every bad frame knocks it back hard, so shaky tracking never reaches 100%. Once locked, only losing the head and shoulders breaks the lock, so raising a hand to brake is fine.
 2. **Wheel held:** both wrists are visible, about a wheel-width apart and not resting in the lap.
-3. **Steering:** the angle of the line between your wrists, as seen in a mirror. Turning clockwise (left hand up, right hand down) steers right. It is offset by your "hold it straight" calibration, has a small dead zone, and reaches full lock at about 40°. Leaning your torso into the turn adds up to 50% extra, but only past a large dead zone, so sitting normally adds nothing.
-4. **Speed:** the height of the wheel relative to your shoulders, measured in shoulder-widths, so it works at any distance. Chest height is a normal ~45 km/h, and shoulder height is fast. Let go and the car rolls to a stop.
+3. **Steering (default, from the brief): torso lean.** Half shoulder tilt, half how far your head has moved over to one side of your shoulders, minus your calibrated "sitting straight" posture. A dead zone keeps normal sitting straight, and full lock is reached at a clear lean. It works even with your hands out of view. *Optional wheel mode:* the angle of the line between your wrists (clockwise = right).
+4. **Speed (default, from the brief): hand distance.** The distance between your wrists divided by your shoulder width, so it works at any distance from the camera. About one shoulder-width apart is slow, and about 2.6 shoulder-widths is full speed. Lower your hands and the car keeps its speed for ~6 s (arm rest), then rolls to a stop. *Optional modes:* Auto speed, wheel height, lean forward/back.
+   Both hands spread wide is never mistaken for an indicator: the indicator needs exactly one arm out.
 5. **Brake:** your right wrist is above your nose (or your right elbow is raised high if the hand leaves the top of the frame). It must hold for 3 frames to brake and drop for 6 frames to release, which filters out flicker.
 
 All video processing happens on your device. Nothing is uploaded.

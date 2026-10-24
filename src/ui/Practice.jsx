@@ -8,12 +8,55 @@ import CameraPanel from './CameraPanel.jsx';
 import { Wheel, LockRing } from './Widgets.jsx';
 
 const CAM_STEPS = [
+  // --- Brief controls (default): lean to steer, hand distance = speed ---
+  {
+    id: 'hold',
+    title: 'Sit up straight, both hands up in front of you',
+    ur: 'Seedha baithein, dono haath seene ke saamne (peele dabbe mein). Haath camera ki taraf na barhayein.',
+    test: () => input.wheelHeld && Math.abs(input.steer) < 0.1,
+    need: 1.2,
+    steer: ['lean'],
+  },
+  {
+    id: 'left',
+    title: 'Lean your body to the LEFT',
+    ur: 'Apna jism baayein (left) taraf jhukayein, gaari left jayegi',
+    test: () => input.steer < -0.6,
+    need: 0.4,
+    steer: ['lean'],
+  },
+  {
+    id: 'right',
+    title: 'Lean your body to the RIGHT',
+    ur: 'Apna jism daayein (right) taraf jhukayein, gaari right jayegi',
+    test: () => input.steer > 0.6,
+    need: 0.4,
+    steer: ['lean'],
+  },
+  {
+    id: 'wide',
+    title: 'Hands WIDE apart = faster',
+    ur: 'Dono haath door door = tez speed',
+    test: () => input.wheelHeld && input.throttle > 0.7,
+    need: 0.4,
+    speed: ['distance'],
+  },
+  {
+    id: 'close',
+    title: 'Hands CLOSE together = slower',
+    ur: 'Dono haath qareeb = aahista speed',
+    test: () => input.wheelHeld && input.throttle < 0.3,
+    need: 0.4,
+    speed: ['distance'],
+  },
+  // --- Optional steering-wheel controls (Settings) ---
   {
     id: 'hold',
     title: 'Hold the wheel straight',
     ur: 'Dono haath seene ke saamne, kohniyan mudi hui (peele dabbe mein). Haath camera ki taraf na barhayein.',
     test: () => input.wheelHeld && Math.abs(input.wheelAngle) < 0.2,
     need: 1.2,
+    steer: ['wheel'],
   },
   {
     id: 'left',
@@ -21,6 +64,7 @@ const CAM_STEPS = [
     ur: 'Steering ko baayein (left) ghumayein: left haath neeche, right haath upar',
     test: () => input.wheelHeld && input.steer < -0.6,
     need: 0.4,
+    steer: ['wheel'],
   },
   {
     id: 'right',
@@ -28,6 +72,7 @@ const CAM_STEPS = [
     ur: 'Steering ko daayein (right) ghumayein: right haath neeche, left haath upar',
     test: () => input.wheelHeld && input.steer > 0.6,
     need: 0.4,
+    steer: ['wheel'],
   },
   {
     id: 'lift',
@@ -36,6 +81,7 @@ const CAM_STEPS = [
     test: () => input.wheelHeld && input.wheelLift < 0.3,
     need: 0.4,
     speed: ['auto'],
+    steer: ['wheel'],
   },
   {
     id: 'lift-up',
@@ -95,9 +141,11 @@ let lastIndicator = null;
 
 function buildSteps(camera, short, level) {
   if (!camera) return [...KEY_STEPS, ...(level?.indicators ? KEY_INDICATORS : [])];
-  if (short) return [CAM_STEPS[0], CAM_BELT];
+  const steerOk = (s) => !s.steer || s.steer.includes(settings.oneHand ? 'wheel' : settings.steerMode);
   const speedOk = (s) => !s.speed || s.speed.includes(settings.speedMode);
-  return [...CAM_STEPS.filter(speedOk), ...(level?.indicators ? CAM_INDICATORS : []), CAM_BELT];
+  const fitting = CAM_STEPS.filter((s) => steerOk(s) && speedOk(s));
+  if (short) return [fitting[0], CAM_BELT];
+  return [...fitting, ...(level?.indicators ? CAM_INDICATORS : []), CAM_BELT];
 }
 
 /**

@@ -15,7 +15,7 @@ const FACE_MODEL =
 export const pose = {
   video: null,
   ready: false,
-  calib: { angle: 0, lean: 0, sw: 0 },
+  calib: { angle: 0, lean: 0, bodyLean: 0, sw: 0 },
 };
 
 let landmarker = null;
@@ -125,6 +125,7 @@ export function endCalibration() {
     };
     pose.calib.angle = Math.max(-0.25, Math.min(0.25, median('angle')));
     pose.calib.lean = Math.max(-0.6, Math.min(0.6, median('lean')));
+    pose.calib.bodyLean = Math.max(-0.6, Math.min(0.6, median('bodyLean')));
     pose.calib.sw = median('sw');
   }
   controls.calibSamples = null;
@@ -165,7 +166,7 @@ function loop() {
     g,
     settings.oneHand ? readOneHand(lm, aspect) : null,
     pose.calib,
-    { speedMode: settings.speedMode, armRest: settings.armRest },
+    { speedMode: settings.speedMode, armRest: settings.armRest, steerMode: settings.steerMode },
     now,
   );
 

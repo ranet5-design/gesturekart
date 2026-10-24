@@ -28,7 +28,7 @@ const vis = (p) => (p ? p.visibility ?? 1 : 0);
  */
 export function readGesture(lm, aspect = 4 / 3) {
   const out = {
-    visible: false, held: false, angle: 0, lift: 0.5, haltRaw: false, lean: 0,
+    visible: false, held: false, angle: 0, lift: 0.5, haltRaw: false, lean: 0, bodyLean: 0,
     sw: 0, span: 0, indicator: null, beltReach: false, beltDown: false, brakeIntent: false, handsSeen: 0,
   };
   if (!lm) return out;
@@ -53,6 +53,12 @@ export function readGesture(lm, aspect = 4 / 3) {
 
   // Torso lean (from the brief): shoulder line tilt. + = leaning right. Works without hands in view.
   out.lean = clamp(Math.atan2(rs.y - ls.y, SRx - SLx) / 0.35, -1.5, 1.5);
+  // Whole-body sideways lean for the brief's "lean torso to steer": shoulder tilt plus how far the
+  // head has moved over to one side of the shoulders. + = leaning right (as the player sees it).
+  if (vis(nose) > 0.5) {
+    const headOff = (mx(nose) - (SLx + SRx) / 2) / sw;
+    out.bodyLean = clamp(0.5 * out.lean + 0.5 * (headOff / 0.3), -1.5, 1.5);
+  } else out.bodyLean = out.lean;
 
   // Brake: right hand clearly above the head. If the hand goes past the top of the frame,
   // a raised right elbow still counts.
@@ -67,14 +73,17 @@ export function readGesture(lm, aspect = 4 / 3) {
     (vis(re) > 0.5 && re.y < rs.y - sw * 0.15);
 
   // Indicator: stretch one arm straight out to the side at shoulder height
+  // Only ONE arm out counts: both hands spread wide is the speed gesture, not an indicator.
   const armOut = (w, e, sx, sy, dir) => {
     const beyond = (p) => (dir < 0 ? sx - mx(p) : mx(p) - sx);
-    const wristOut = vis(w) > 0.5 && beyond(w) > sw * 1.05 && Math.abs(w.y - sy) < sw * 0.7;
-    const elbowOut = vis(e) > 0.5 && beyond(e) > sw * 0.55 && Math.abs(e.y - sy) < sw * 0.5 && vis(w) < 0.5;
+    const wristOut = vis(w) > 0.5 && beyond(w) > sw * 1.05 && Math.abs(w.y - sy) < sw * 0.45;
+    const elbowOut = vis(e) > 0.5 && beyond(e) > sw * 0.55 && Math.abs(e.y - sy) < sw * 0.4 && vis(w) < 0.5;
     return wristOut || elbowOut;
   };
-  if (armOut(lw, le, SLx, ls.y, -1)) out.indicator = 'left';
-  else if (!out.haltRaw && armOut(rw, re, SRx, rs.y, 1)) out.indicator = 'right';
+  const leftOut = armOut(lw, le, SLx, ls.y, -1);
+  const rightOut = !out.haltRaw && armOut(rw, re, SRx, rs.y, 1);
+  if (leftOut && !rightOut) out.indicator = 'left';
+  else if (rightOut && !leftOut) out.indicator = 'right';
 
   // Seatbelt: right hand reaches over to the left shoulder, then pulls down to the right hip
   if (vis(rw) > 0.5) {
@@ -164,6 +173,13 @@ export function combineSteer(wheelSteer, lean) {
   const a = Math.abs(lean);
   const leanSteer = a < 0.35 ? 0 : Math.sign(lean) * Math.min(1, (a - 0.35) / 0.65) * 0.5;
   return clamp(wheelSteer + leanSteer, -1, 1);
+}
+
+/** Torso lean -> steering (the brief's main steering control). Dead zone so sitting normally is straight. */
+export function leanToSteer(lean, dead = 0.2, full = 0.9) {
+  const a = Math.abs(lean);
+  if (a < dead) return 0;
+  return Math.sign(lean) * clamp((a - dead) / (full - dead), 0, 1);
 }
 
 // Wheel height -> gas. Chest height is a normal ~45 km/h, shoulder height is fast.

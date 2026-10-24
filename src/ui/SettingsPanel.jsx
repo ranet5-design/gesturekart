@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import { settings, setSetting, onSettings } from '../game/settings.js';
 import { urduSupport } from '../audio/voice.js';
 
+const STEER = [
+  ['lean', 'Lean your torso (brief · default)', 'Lean your body left or right to steer, exactly as the hackathon brief describes.'],
+  ['wheel', 'Virtual steering wheel (extra)', 'Hold both hands like a steering wheel and turn it. An optional improvement.'],
+];
 const SPEED = [
-  ['auto', 'Auto speed (easiest)', 'The car keeps a safe speed. Lower the wheel to slow down, right hand up to stop.'],
-  ['lift', 'Wheel height', 'Lift the wheel toward your shoulders to go faster, lower it to slow down.'],
-  ['distance', 'Hand distance (brief)', 'Hands wide apart = faster, close together = slower.'],
-  ['lean', 'Lean forward / back', 'Lean toward the camera to speed up, sit back to slow down.'],
+  ['distance', 'Hand distance (brief · default)', 'Hands wide apart = faster, close together = slower, as in the brief.'],
+  ['auto', 'Auto speed (extra)', 'The car keeps a safe speed by itself. Right hand up still stops.'],
+  ['lift', 'Wheel height (extra)', 'Lift your hands toward your shoulders to go faster, lower them to slow down.'],
+  ['lean', 'Lean forward / back (extra)', 'Lean toward the camera to speed up, sit back to slow down.'],
 ];
 
 function Toggle({ k, label, hint }) {
@@ -70,6 +74,20 @@ export default function SettingsPanel({ onClose }) {
                 }[urduSupport()]
               : 'Urdu needs an Urdu or Hindi voice on your computer. Microsoft Edge has natural Urdu voices built in.'}
           </small>
+        </section>
+
+        <section>
+          <h3>Steering (webcam)</h3>
+          <div className="speed-modes">
+            {STEER.map(([id, name, hint]) => (
+              <label key={id} className={settings.steerMode === id ? 'on' : ''}>
+                <input type="radio" name="steerMode" checked={settings.steerMode === id} onChange={() => setSetting('steerMode', id)} />
+                <b>{name}</b>
+                <small>{hint}</small>
+              </label>
+            ))}
+          </div>
+          <small className="muted">Brake is always: raise your right hand above your head.</small>
         </section>
 
         <section>

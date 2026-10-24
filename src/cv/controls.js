@@ -1,6 +1,6 @@
 // Turns per-frame gesture readings into the car's controls (steer, throttle, brake, indicator, seatbelt).
 // Pure code (no camera, no MediaPipe), so it can be unit-tested with synthetic poses.
-import { angleToSteer, liftToThrottle, spanToThrottle, leanFwdToThrottle, combineSteer } from './gestures.js';
+import { angleToSteer, liftToThrottle, spanToThrottle, leanFwdToThrottle, combineSteer, leanToSteer } from './gestures.js';
 
 export function createControls() {
   return {
@@ -25,7 +25,7 @@ export function createControls() {
  * @param calib  { angle, lean, sw }       @param opts { speedMode, armRest }
  * @param now    ms timestamp
  */
-export function applyGesture(S, input, g, one, calib, { speedMode = 'auto', armRest = true } = {}, now = 0) {
+export function applyGesture(S, input, g, one, calib, { speedMode = 'auto', armRest = true, steerMode = 'wheel' } = {}, now = 0) {
   input.poseVisible = g.visible;
 
   // ---- Brake (debounced so a single bad frame never brakes) ----
@@ -103,11 +103,44 @@ export function applyGesture(S, input, g, one, calib, { speedMode = 'auto', armR
     return;
   }
 
+  if (S.calibSamples && g.visible) S.calibSamples.push({ angle: heldRaw ? g.angle : null, lean: g.lean, bodyLean: g.bodyLean, sw: g.sw });
+
+  // ---- Brief mode: lean the torso to steer, hand distance = speed ----
+  if (steerMode === 'lean' && !one) {
+    if (g.visible) {
+      const target = leanToSteer((g.bodyLean ?? g.lean) - (calib.bodyLean ?? 0));
+      input.steer += (target - input.steer) * 0.3;
+      if (Math.abs(input.steer) < 0.02 && target === 0) input.steer = 0;
+    } else {
+      input.steer *= 0.8;
+    }
+    input.steerSource = 'lean';
+    input.wheelAngle += (input.steer * 0.7 - input.wheelAngle) * 0.3;
+    if (heldRaw) {
+      S.restFrames = 0;
+      input.resting = false;
+      input.wheelLift += (g.lift - input.wheelLift) * 0.25;
+      const t =
+        speedMode === 'distance' ? spanToThrottle(g.span)
+        : speedMode === 'lean' ? leanFwdToThrottle(g.sw, calib.sw)
+        : liftToThrottle(input.wheelLift);
+      input.throttle += (t - input.throttle) * 0.2;
+    } else if (!input.wheelHeld && speedMode !== 'auto') {
+      if (speedMode === 'lean' && g.visible) {
+        input.throttle += (leanFwdToThrottle(g.sw, calib.sw) - input.throttle) * 0.2;
+      } else {
+        S.restFrames++;
+        input.resting = armRest && S.restFrames < 180;
+        if (!input.resting) input.throttle += (0 - input.throttle) * 0.08;
+      }
+    }
+    return;
+  }
+
   if (heldRaw) {
     S.restFrames = 0;
     input.resting = false;
     input.steerSource = 'wheel';
-    if (S.calibSamples) S.calibSamples.push({ angle: g.angle, lean: g.lean, sw: g.sw });
     let steerTarget;
     if (one) {
       steerTarget = one.steer;

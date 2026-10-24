@@ -3253,3 +3253,88 @@ summary:focus-visible {
   border-color: var(--good);
   color: #86efac;
 }
+
+/* how-to art for the brief controls */
+.art-lean .body,
+.art-lean .head {
+  position: absolute;
+  background: #cbd5e1;
+  left: calc(50% - 18px);
+  transform-origin: 50% 100%;
+  animation: lean 2.6s ease-in-out infinite;
+}
+.art-lean .body {
+  width: 36px;
+  height: 54px;
+  bottom: 10px;
+  border-radius: 18px 18px 6px 6px;
+}
+.art-lean .head {
+  width: 30px;
+  height: 30px;
+  left: calc(50% - 15px);
+  bottom: 68px;
+  border-radius: 50%;
+  transform-origin: 50% 210%;
+}
+.art-lean .arr.l {
+  left: 16%;
+  top: 40%;
+}
+.art-lean .arr.r {
+  right: 16%;
+  top: 40%;
+}
+@keyframes lean {
+  0%,
+  100% {
+    transform: rotate(-16deg);
+  }
+  50% {
+    transform: rotate(16deg);
+  }
+}
+.art-span {
+  gap: 0;
+}
+.art-span .hand {
+  position: absolute;
+  top: 30px;
+  font-size: 30px;
+}
+.art-span .hand.l {
+  animation: spanL 2s ease-in-out infinite;
+}
+.art-span .hand.r {
+  animation: spanR 2s ease-in-out infinite;
+}
+.art-span .gap {
+  position: absolute;
+  top: 36px;
+  font-size: 24px;
+  color: var(--accent);
+}
+.art-span small {
+  position: absolute;
+  bottom: 10px;
+  color: var(--good);
+  font-weight: 700;
+}
+@keyframes spanL {
+  0%,
+  100% {
+    left: 38%;
+  }
+  50% {
+    left: 12%;
+  }
+}
+@keyframes spanR {
+  0%,
+  100% {
+    right: 38%;
+  }
+  50% {
+    right: 12%;
+  }
+}

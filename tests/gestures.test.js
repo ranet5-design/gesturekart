@@ -50,6 +50,10 @@ describe('brake, indicator and seatbelt gestures', () => {
     const r = g.readGesture(body({ rw: [0.05, 0.46], re: [0.2, 0.46] }), A);
     expect(r.indicator).toBe('right');
   });
+  it('both hands spread wide (the speed gesture) is not an indicator', () => {
+    const r = g.readGesture(body({ lw: [0.92, 0.5], rw: [0.08, 0.5], le: [0.78, 0.48], re: [0.22, 0.48] }), A);
+    expect(r.indicator).toBe(null);
+  });
   it('detects the two halves of the seatbelt motion', () => {
     expect(g.readGesture(body({ rw: [0.6, 0.47] }), A).beltReach).toBe(true);
     expect(g.readGesture(body({ rw: [0.38, 0.75] }), A).beltDown).toBe(true);

@@ -122,6 +122,24 @@ function Art({ kind }) {
         <span className="arr down">▼</span>
       </div>
     );
+  if (kind === 'lean')
+    return (
+      <div className="art art-lean" aria-hidden="true">
+        <span className="arr l">◀</span>
+        <span className="body" />
+        <span className="head" />
+        <span className="arr r">▶</span>
+      </div>
+    );
+  if (kind === 'span')
+    return (
+      <div className="art art-span" aria-hidden="true">
+        <span className="hand l">✋</span>
+        <span className="gap">⟷</span>
+        <span className="hand r">🤚</span>
+        <small>wide = fast</small>
+      </div>
+    );
   if (kind === 'indicator')
     return (
       <div className="art art-ind" aria-hidden="true">
@@ -149,8 +167,8 @@ function Art({ kind }) {
 }
 
 const HOW = [
-  { art: 'turn', title: 'Turn the wheel', text: 'Hold both hands in front of your chest like a steering wheel. Turn it, and the car goes that way. Hands out of view? Lean your body instead.', ur: 'Steering ghumayein, gaari usi taraf jayegi' },
-  { art: 'lift', title: 'Speed', text: 'Auto speed keeps a safe speed for you. Lower the wheel toward your belly to slow down. (Other speed modes are in Settings.)', ur: 'Wheel neeche = aahista' },
+  { art: 'lean', title: 'Lean to steer', text: 'Lean your upper body to the left or right and the car steers that way. Sit straight to drive straight.', ur: 'Jism left/right jhukayein = steering' },
+  { art: 'span', title: 'Hand distance = speed', text: 'Hold both hands up in front of you, like gripping a wide wheel. Hands wide apart = faster, close together = slower.', ur: 'Haath door = tez, qareeb = aahista' },
   { art: 'brake', title: 'Right hand up = brake', text: 'At a red light, raise your right hand above your head. Wait for green, then hold the wheel again.', ur: 'Laal batti par right haath upar' },
   { art: 'indicator', title: 'Arm out = indicator', text: 'Before changing lanes, stretch your left or right arm straight out to the side for a second.', ur: 'Lane badalne se pehle baazu bahar = indicator' },
   { art: 'belt', title: 'Seatbelt first', text: 'Before every drive: reach your right hand to your left shoulder, then pull it down to your right hip.', ur: 'Pehle seatbelt: daayan haath baayen kandhe se neeche' },

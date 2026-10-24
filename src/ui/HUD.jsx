@@ -10,10 +10,11 @@ import { Wheel, SpeedGauge } from './Widgets.jsx';
 
 const SPEED_HELP = {
   auto: ['Auto speed is on', 'Lower the wheel = slower', 'Right hand up = stop'],
-  lift: ['Lift wheel = faster', 'Lower wheel = slower', 'Right hand up = stop'],
+  lift: ['Lift hands = faster', 'Lower hands = slower', 'Right hand up = stop'],
   distance: ['Hands wide = faster', 'Hands close = slower', 'Right hand up = stop'],
   lean: ['Lean forward = faster', 'Sit back = slower', 'Right hand up = stop'],
 };
+const steerHelp = () => (settings.steerMode === 'lean' && !settings.oneHand ? 'Lean left / right = steer' : 'Turn wheel = steer');
 
 function snapshot() {
   const front = game.s + CAR_LEN / 2;
@@ -102,12 +103,12 @@ export default function HUD({ onPause, paused, muted, onMute, view, onView, onSe
     ? { cls: 'halt', icon: '✋', text: 'BRAKING' }
     : s.resting
       ? { cls: 'rest', icon: '🛋', text: 'ARM REST: CRUISE' }
-      : s.lean
-        ? { cls: 'lean', icon: '↔', text: 'LEAN STEERING' }
-        : !s.held
-          ? { cls: 'off', icon: '🙌', text: 'HOLD THE WHEEL' }
+      : !s.held && !(s.lean && settings.speedMode === 'auto')
+        ? { cls: 'off', icon: '🙌', text: s.lean ? 'HANDS UP FOR SPEED' : 'HOLD THE WHEEL' }
+        : s.lean
+          ? { cls: 'lean', icon: '↔', text: 'LEAN TO STEER' }
           : { cls: 'drive', icon: '●', text: 'DRIVING' };
-  const help = camera ? SPEED_HELP[settings.speedMode] || SPEED_HELP.auto : null;
+  const help = camera ? [steerHelp(), ...(SPEED_HELP[settings.speedMode] || SPEED_HELP.auto)] : null;
   const rule = s.rule && RULES[s.rule.type];
 
   return (
